@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fix-postgres-permissions
+  namespace: airflow
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: fix-perms
+        image: busybox:latest
+        command: ["sh", "-c", "rm -rf /data/* && chmod -R 777 /data"]
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: postgres-data-pvc

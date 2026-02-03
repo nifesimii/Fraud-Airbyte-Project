@@ -1,0 +1,53 @@
+executor: "KubernetesExecutor"
+cleanUpPods: false
+
+images:
+  airflow:
+    repository: my-dags
+    tag: "20260131052649"
+    pullPolicy: IfNotPresent
+
+scheduler:
+  replicas: 1
+
+triggerer:
+  replicas: 1
+
+workers:
+  replicas: 0
+
+redis:
+  enabled: false
+
+postgresql:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: "14.10.0"
+    pullPolicy: IfNotPresent
+  auth:
+    enablePostgresUser: true
+    postgresPassword: postgres
+  primary:
+    persistence:
+      enabled: false
+
+logs:
+  persistence:
+    enabled: false  # ← Disabled because local-path doesn't support ReadWriteMany
+
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+config:
+  core:
+    load_examples: "False"
+  webserver:
+    expose_config: "True"
+  kubernetes:
+    delete_worker_pods: "False"
+    delete_worker_pods_on_failure: "False"

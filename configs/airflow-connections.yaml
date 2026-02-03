@@ -1,0 +1,18 @@
+# Airflow Connections Configuration
+# Import via: airflow connections import connections.yaml
+
+connections:
+  - conn_id: airbyte_cloud
+    conn_type: http
+    host: https://api.airbyte.com
+    extra: |
+      {
+        "Authorization": "Bearer YOUR_API_KEY_HERE"
+      }
+  
+  - conn_id: aws_default
+    conn_type: aws
+    extra: |
+      {
+        "region_name": "us-east-1"
+      }
