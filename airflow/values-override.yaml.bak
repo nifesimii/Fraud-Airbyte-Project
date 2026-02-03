@@ -35,13 +35,22 @@ postgresql:
 
 logs:
   persistence:
-    enabled: false  # Disabled - local-path doesn't support ReadWriteMany
+    enabled: false # Disabled - local-path doesn't support ReadWriteMany
 
 dags:
   persistence:
     enabled: false
   gitSync:
-    enabled: false
+    enabled: true
+    repo: https://github.com/nifesimii/Fraud-Airbyte-Project.git
+    branch: main
+    rev: HEAD
+    depth: 1
+    maxFailures: 0
+    subPath: "airflow/dags"
+    wait: 60
+    containerName: git-sync
+    uid: 65533
 
 config:
   core:
