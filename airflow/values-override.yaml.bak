@@ -33,10 +33,17 @@ postgresql:
     persistence:
       enabled: false
 
+# ============================================================================
+# PERSISTENT LOGS CONFIGURATION
+# ============================================================================
 logs:
   persistence:
-    enabled: false # Disabled - local-path doesn't support ReadWriteMany
+    enabled: true
+    existingClaim: airflow-logs
 
+# ============================================================================
+# DAG CONFIGURATION (Git-Sync)
+# ============================================================================
 dags:
   persistence:
     enabled: false
@@ -52,6 +59,9 @@ dags:
     containerName: git-sync
     uid: 65533
 
+# ============================================================================
+# AIRFLOW CONFIGURATION
+# ============================================================================
 config:
   core:
     load_examples: "False"
@@ -60,3 +70,21 @@ config:
   kubernetes:
     delete_worker_pods: "False"
     delete_worker_pods_on_failure: "False"
+  logging:
+    base_log_folder: "/opt/airflow/logs"
+    remote_logging: "False"
+    logging_level: "INFO"
+    fab_logging_level: "WARNING"
+    # ✅ FIXED: Escaped Jinja2 templates for Helm
+    log_filename_template: "{{`{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log`}}"
+    log_processor_filename_template: "{{`{{ filename }}.log`}}"
+    dag_processor_manager_log_location: "/opt/airflow/logs/dag_processor_manager/dag_processor_manager.log"
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+env:
+  - name: AIRFLOW__CORE__DAGS_FOLDER
+    value: "/opt/airflow/dags"
+  - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
+    value: "/opt/airflow/logs"
