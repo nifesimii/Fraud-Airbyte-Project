@@ -75,10 +75,12 @@ config:
     remote_logging: "False"
     logging_level: "INFO"
     fab_logging_level: "WARNING"
-    # ✅ FIXED: Escaped Jinja2 templates for Helm
     log_filename_template: "{{`{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log`}}"
     log_processor_filename_template: "{{`{{ filename }}.log`}}"
     dag_processor_manager_log_location: "/opt/airflow/logs/dag_processor_manager/dag_processor_manager.log"
+    # ✅ ADD THESE LINES:
+    task_log_reader: "file.task" # Read from filesystem, not worker pods
+    logging_config_class: "" # Use default file-based logging
 
 # ============================================================================
 # ENVIRONMENT VARIABLES
@@ -88,3 +90,6 @@ env:
     value: "/opt/airflow/dags"
   - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
     value: "/opt/airflow/logs"
+  # ✅ ADD: Force file-based log reading
+  - name: AIRFLOW__LOGGING__TASK_LOG_READER
+    value: "file.task"
