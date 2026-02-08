@@ -10,11 +10,12 @@
 # RUN pip install --no-cache-dir -r requirements.txt
 
 
-FROM docker.io/apache/airflow:3.0.2-python3.11
+FROM apache/airflow:3.0.2-python3.11
 
-COPY dags/ /opt/airflow/dags/
+USER airflow
 
-# Copy from current context (airflow directory)
+# Only install your custom Python dependencies
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
+
+# DON'T copy DAGs - they come from git-sync now

@@ -1,0 +1,19 @@
+# .airflowignore
+# Ignore git-sync internals
+.worktrees/
+.git/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore backup files
+*.bak
+*.backup
+*~

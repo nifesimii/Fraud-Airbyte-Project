@@ -57,7 +57,12 @@ dags:
     subPath: "airflow/dags"
     wait: 60
     containerName: git-sync
-    uid: 65533
+    uid:
+      65533
+      # Add this to use simpler sync method:
+    extraVolumeMounts:
+      - name: dags
+        mountPath: /git
 
 # ============================================================================
 # AIRFLOW CONFIGURATION

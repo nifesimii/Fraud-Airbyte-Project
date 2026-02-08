@@ -1,15 +1,3 @@
-# Terraform
-.terraform/
-.terraform.lock.hcl
-terraform.tfstate
-terraform.tfstate.backup
-*.tfstate
-*.tfstate.*
-
-# Terraform variable files
-*.tfvars.backup
-*.auto.tfvars
-
 # IDE
 .vscode/
 .idea/
@@ -46,3 +34,5 @@ secrets/
 *.pem
 *.key
 *.crt
+airbyte-secrets.yaml
+11:~$ ssh ubuntu@54.91.45.100 "netstat -tlnp | grep 5433"

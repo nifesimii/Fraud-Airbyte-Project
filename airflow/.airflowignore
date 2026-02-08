@@ -1,9 +1,0 @@
-# .airflowignore
-.git
-.worktrees
-.gitignore
-__pycache__
-*.pyc
-*.pyo
-.pytest_cache
-.DS_Store
