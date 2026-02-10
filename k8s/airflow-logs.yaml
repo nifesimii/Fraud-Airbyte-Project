@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airflow-logs
+  namespace: airflow
+spec:
+  accessModes:
+    - ReadWriteOnce  # ← Changed from ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path # For Rancher Desktop/K3s

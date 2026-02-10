@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-source-initdb
+  namespace: airflow
+data:
+  init.sql: |
+    -- Create fraud analytics database
+    CREATE DATABASE fraud_analytics;
+    CREATE DATABASE customer_data;
+    
+    -- Connect to fraud_analytics
+    \c fraud_analytics;
+    
+    -- Customer profiles table
+    CREATE TABLE IF NOT EXISTS customer_profiles (
+      customer_id VARCHAR(100) PRIMARY KEY,
+      name VARCHAR(255),
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      registration_date DATE,
+      country VARCHAR(100),
+      risk_score DECIMAL(5,2),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Account activity table
+    CREATE TABLE IF NOT EXISTS account_activity (
+      activity_id SERIAL PRIMARY KEY,
+      customer_id VARCHAR(100),
+      activity_type VARCHAR(50),
+      activity_timestamp TIMESTAMP,
+      ip_address VARCHAR(50),
+      device_id VARCHAR(255),
+      location VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Transaction logs table
+    CREATE TABLE IF NOT EXISTS transaction_logs (
+      log_id SERIAL PRIMARY KEY,
+      transaction_id VARCHAR(255),
+      customer_id VARCHAR(100),
+      amount DECIMAL(10,2),
+      currency VARCHAR(10),
+      merchant_name VARCHAR(255),
+      transaction_type VARCHAR(50),
+      status VARCHAR(50),
+      timestamp TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Insert sample data
+    INSERT INTO customer_profiles (customer_id, name, email, phone, registration_date, country, risk_score)
+    VALUES 
+      ('CUST001', 'John Doe', 'john@example.com', '+234-801-234-5678', '2024-01-15', 'Nigeria', 2.5),
+      ('CUST002', 'Jane Smith', 'jane@example.com', '+233-20-123-4567', '2024-02-20', 'Ghana', 7.8),
+      ('CUST003', 'Bob Johnson', 'bob@example.com', '+254-712-345-678', '2024-03-10', 'Kenya', 1.2),
+      ('CUST004', 'Alice Williams', 'alice@example.com', '+234-802-987-6543', '2024-01-25', 'Nigeria', 8.9);
+    
+    INSERT INTO account_activity (customer_id, activity_type, activity_timestamp, ip_address, device_id, location)
+    VALUES 
+      ('CUST001', 'login', NOW() - INTERVAL '1 hour', '192.168.1.1', 'DEVICE001', 'Lagos, Nigeria'),
+      ('CUST002', 'transaction', NOW() - INTERVAL '2 hours', '192.168.1.2', 'DEVICE002', 'Accra, Ghana'),
+      ('CUST003', 'profile_update', NOW() - INTERVAL '3 hours', '192.168.1.3', 'DEVICE003', 'Nairobi, Kenya'),
+      ('CUST004', 'password_change', NOW() - INTERVAL '30 minutes', '192.168.1.4', 'DEVICE004', 'Lagos, Nigeria');
+    
+    INSERT INTO transaction_logs (transaction_id, customer_id, amount, currency, merchant_name, transaction_type, status, timestamp)
+    VALUES 
+      ('TXN_PG_001', 'CUST001', 5000.00, 'NGN', 'Shoprite', 'purchase', 'completed', NOW() - INTERVAL '1 hour'),
+      ('TXN_PG_002', 'CUST002', 25000.00, 'GHS', 'Amazon', 'purchase', 'completed', NOW() - INTERVAL '2 hours'),
+      ('TXN_PG_003', 'CUST003', 10000.00, 'KES', 'Jumia', 'purchase', 'completed', NOW() - INTERVAL '3 hours'),
+      ('TXN_PG_004', 'CUST004', 150000.00, 'NGN', 'Unknown Merchant', 'purchase', 'flagged', NOW() - INTERVAL '30 minutes');
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-source
+  namespace: airflow
+  labels:
+    app: postgres-source
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-source
+  template:
+    metadata:
+      labels:
+        app: postgres-source
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "postgres"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: postgres-initdb
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: postgres-initdb
+        configMap:
+          name: postgres-source-initdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-source
+  namespace: airflow
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: postgres-source

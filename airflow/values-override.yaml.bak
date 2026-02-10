@@ -6,6 +6,10 @@ images:
     repository: my-dags
     tag: "20260131164649"
     pullPolicy: IfNotPresent
+  gitSync:
+    repository: registry.k8s.io/git-sync/git-sync
+    tag: v3.3.0
+    pullPolicy: IfNotPresent
 
 scheduler:
   replicas: 1
@@ -33,17 +37,11 @@ postgresql:
     persistence:
       enabled: false
 
-# ============================================================================
-# PERSISTENT LOGS CONFIGURATION
-# ============================================================================
 logs:
   persistence:
-    enabled: false
-    existingClaim: airflow-logs
+    enabled: false  # ← Change from false to true
+    existingClaim: airflow-logs  # ← Add this to use your PVC
 
-# ============================================================================
-# DAG CONFIGURATION (Git-Sync)
-# ============================================================================
 dags:
   persistence:
     enabled: false
@@ -51,25 +49,18 @@ dags:
     enabled: true
     repo: https://github.com/nifesimii/Fraud-Airbyte-Project.git
     branch: main
-    rev: HEAD
-    depth: 1
-    maxFailures: 0
     subPath: "airflow/dags"
     wait: 60
-    containerName: git-sync
-    uid:
-      65533
-      # Add this to use simpler sync method:
-    extraVolumeMounts:
-      - name: dags
-        mountPath: /git
 
-# ============================================================================
-# AIRFLOW CONFIGURATION
-# ============================================================================
 config:
   core:
     load_examples: "False"
+    # ✅ ADD THIS - Tell Airflow to ignore git-sync directories
+    dagbag_import_error_tracebacks: "False"
+    dagbag_import_error_traceback_depth: "2"
+  scheduler:
+    # ✅ ADD THIS - Ignore patterns for DAG discovery
+    ignore_first_depends_on_past_by_default: "True"
   webserver:
     expose_config: "True"
   kubernetes:
@@ -83,18 +74,15 @@ config:
     log_filename_template: "{{`{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log`}}"
     log_processor_filename_template: "{{`{{ filename }}.log`}}"
     dag_processor_manager_log_location: "/opt/airflow/logs/dag_processor_manager/dag_processor_manager.log"
-    # ✅ ADD THESE LINES:
-    task_log_reader: "file.task" # Read from filesystem, not worker pods
-    logging_config_class: "" # Use default file-based logging
+    task_log_reader: "file.task"
+    logging_config_class: ""
 
-# ============================================================================
-# ENVIRONMENT VARIABLES
-# ============================================================================
 env:
   - name: AIRFLOW__CORE__DAGS_FOLDER
-    value: "/opt/airflow/dags"
+    value: "/opt/airflow/dags/repo/airflow/dags"  # ← Fixed path
   - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
     value: "/opt/airflow/logs"
-  # ✅ ADD: Force file-based log reading
   - name: AIRFLOW__LOGGING__TASK_LOG_READER
     value: "file.task"
+  - name: AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE
+    value: "True"

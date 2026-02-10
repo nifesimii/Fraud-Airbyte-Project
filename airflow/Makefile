@@ -12,6 +12,12 @@ POSTGRES_SOURCE_PASSWORD := postgres
 MYSQL_PASSWORD := airflow123
 PGADMIN_PASSWORD := admin
 VALUES_FILE := values-override.yaml
+SNOWFLAKE_USER := NIFESIMII
+SNOWFLAKE_PASSWORD := Damilola16@1997??
+SNOWFLAKE_ACCOUNT :=  nzpgsnz-us68200
+SNOWFLAKE_WAREHOUSE := AIRBYTE_DATABASE
+SNOWFLAKE_ROLE := AIRBYTE_ROLE
+
 
 # Colors
 GREEN := \033[0;32m
@@ -366,6 +372,17 @@ add-aws-conn: ## Add AWS connection
 		airflow connections add aws_conn --conn-type aws --conn-extra '{"region_name":"us-east-1"}' 2>/dev/null || true
 	@echo "$(GREEN)✓ AWS connection added$(NC)"
 
+setup-snowflake-connection:
+	@echo "━━━ Setting up Snowflake Connection ━━━"
+	kubectl exec -n airflow deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add 'snowflake_default' \
+		--conn-type 'snowflake' \
+		--conn-login '$(SNOWFLAKE_USER)' \
+		--conn-password '$(SNOWFLAKE_PASSWORD)' \
+		--conn-schema 'STAGING' \
+		--conn-extra '{"account": "$(SNOWFLAKE_ACCOUNT)", "warehouse": "$(SNOWFLAKE_WAREHOUSE)", "database": "FRAUD_DETECTION", "role": "$(SNOWFLAKE_ROLE)"}'
+	@echo "✓ Snowflake connection configured"
+
 add-conn: ## Add connection (usage: make add-conn CONN_ID=my_conn CONN_TYPE=http CONN_HOST=example.com)
 	@if [ -z "$(CONN_ID)" ] || [ -z "$(CONN_TYPE)" ]; then \
 		echo "$(RED)Usage: make add-conn CONN_ID=<id> CONN_TYPE=<type> [CONN_HOST=<host>]$(NC)"; \
@@ -379,7 +396,7 @@ list-connections: ## List all connections
 	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
 		airflow connections list
 
-setup-connections: add-airbyte-conn add-mysql-conn add-postgres-source-conn ## Setup all connections
+setup-connections: add-airbyte-conn add-mysql-conn add-postgres-source-conn setup-snowflake-connection ## Setup all connections
 
 # ============================================================================
 # TESTING

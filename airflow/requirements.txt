@@ -25,3 +25,9 @@ apache-airflow-providers-mysql==6.4.2
 
 # Integration Providers
 apache-airflow-providers-airbyte==5.3.2
+
+
+# ✅ ADD THESE - Soda packages
+soda-core-spark==3.3.2
+soda-core-postgres==3.3.2
+soda-core-mysql==3.3.2

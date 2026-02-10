@@ -1,0 +1,26 @@
+
+# Soda Quality Checks for Customers (Staging)
+
+checks for customers:
+  # Completeness
+  - missing_count(customer_id) = 0
+  - missing_count(email) = 0
+  - missing_count(created_at) = 0
+  
+  # Validity
+  - invalid_count(email) = 0:
+      valid format: email
+  - duplicate_count(customer_id) = 0
+  - duplicate_count(email) = 0
+  
+  # Schema checks
+  - schema:
+      name: Ensure schema hasn't changed
+      warn:
+        when required column missing: [customer_id, email, first_name, last_name, created_at]
+      fail:
+        when forbidden column present: [ssn, credit_card]
+        when wrong column type:
+          customer_id: varchar
+          email: varchar
+          created_at: timestamp

@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-initdb
+  namespace: airflow
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS fraud_data;
+    USE fraud_data;
+
+    CREATE TABLE IF NOT EXISTS transactions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      transaction_id VARCHAR(255),
+      amount DECIMAL(10,2),
+      timestamp DATETIME,
+      customer_id VARCHAR(100),
+      merchant VARCHAR(255),
+      is_fraud BOOLEAN,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Sample data
+    INSERT INTO transactions (transaction_id, amount, timestamp, customer_id, merchant, is_fraud)
+    VALUES 
+      ('TXN001', 150.00, NOW(), 'CUST001', 'Amazon', FALSE),
+      ('TXN002', 5000.00, NOW(), 'CUST002', 'Suspicious Store', TRUE);
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: airflow
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "rootpassword"
+            - name: MYSQL_DATABASE
+              value: "fraud_data"
+            - name: MYSQL_USER
+              value: "airflow"
+            - name: MYSQL_PASSWORD
+              value: "airflow123"
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: mysql-initdb
+              mountPath: /docker-entrypoint-initdb.d
+          # REMOVED persistent storage for dev environment
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+                - -u
+                - root
+                - -prootpassword
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+                - -u
+                - root
+                - -prootpassword
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+      volumes:
+        - name: mysql-initdb
+          configMap:
+            name: mysql-initdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: airflow
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+      targetPort: 3306
+      protocol: TCP
+      name: mysql
+  selector:
+    app: mysql
