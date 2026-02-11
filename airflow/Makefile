@@ -12,11 +12,13 @@ POSTGRES_SOURCE_PASSWORD := postgres
 MYSQL_PASSWORD := airflow123
 PGADMIN_PASSWORD := admin
 VALUES_FILE := values-override.yaml
-SNOWFLAKE_USER := NIFESIMII
-SNOWFLAKE_PASSWORD := Damilola16@1997??
-SNOWFLAKE_ACCOUNT :=  nzpgsnz-us68200
-SNOWFLAKE_WAREHOUSE := AIRBYTE_DATABASE
-SNOWFLAKE_ROLE := AIRBYTE_ROLE
+
+
+# ✅ Load Snowflake credentials from .env file
+-include .env
+export
+
+
 
 
 # Colors
