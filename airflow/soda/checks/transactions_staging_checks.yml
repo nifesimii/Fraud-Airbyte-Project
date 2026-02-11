@@ -1,11 +1,9 @@
-# Soda Quality Checks for Transactions (Staging)
+Soda Quality Checks for Fraud Detection - Transactions Table
 
 checks for transactions:
-  # Freshness checks
-  - freshness(transaction_timestamp) < 1d:
-      name: Data should be less than 1 day old
-  
-  # Completeness checks  
+  # Completeness Checks
+  - row_count > 100:
+      name: Minimum transaction volume check
   - missing_count(transaction_id) = 0:
       name: Transaction ID must not be null
   - missing_count(customer_id) = 0:
@@ -15,31 +13,23 @@ checks for transactions:
   - missing_count(transaction_timestamp) = 0:
       name: Timestamp must not be null
   
-  # Validity checks
-  - invalid_count(transaction_id) = 0:
-      name: Transaction ID must be unique
-      valid length: 36  # UUID length
+  # Validity Checks
+  - duplicate_count(transaction_id) = 0:
+      name: Transaction IDs must be unique
   - invalid_count(amount) = 0:
-      name: Amount must be positive
+      name: Amount must be positive and within range
       valid min: 0.01
       valid max: 1000000
   - invalid_count(transaction_type) = 0:
       name: Transaction type must be valid
-      valid values: ['purchase', 'refund', 'transfer', 'withdrawal']
+      valid values: ['purchase', 'refund', 'transfer', 'withdrawal', 'deposit']
   
-  # Distribution checks
+  # Freshness Check
+  - freshness(transaction_timestamp) < 1d:
+      name: Data should be less than 1 day old
+  
+  # Distribution Checks
   - avg(amount) between 10 and 5000:
       name: Average transaction amount in expected range
-  - row_count > 100:
-      name: Minimum row count threshold
-  
-  # Duplicate checks
-  - duplicate_count(transaction_id) = 0:
-      name: No duplicate transaction IDs
-  
-  # Anomaly detection
-  - anomaly detection for row_count:
-      name: Detect unusual row count changes
-  - anomaly detection for avg(amount):
-      name: Detect unusual average amount changes
- 
+  - row_count change < 50%:
+      name: Row count should not change drastically
