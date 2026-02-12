@@ -520,7 +520,6 @@ reset-db: ## Reset database (WARNING: deletes all data)
 	@echo "$(GREEN)Database reset$(NC)"
 
 
-# Add this section after the CONNECTIONS section and before TESTING section
 
 # ============================================================================
 # FRAUD DETECTION PIPELINE
@@ -669,3 +668,229 @@ fraud-pipeline-help: ## Show fraud pipeline setup guide
 	@echo ""
 	@echo "$(CYAN)📚 Documentation:$(NC)"
 	@echo "   See: FRAUD_PIPELINE_SETUP.md"
+
+
+
+# ============================================================================
+# SODA DATA QUALITY INTEGRATION (KUBERNETES POD OPERATOR)
+# ============================================================================
+
+.PHONY: setup-soda-k8s install-k8s-provider setup-soda-rbac setup-soda-vars test-soda-dag
+
+setup-soda-k8s: install-k8s-provider setup-soda-rbac setup-soda-vars ## Complete Soda + K8s setup
+	@echo "$(GREEN)✓ Soda K8s integration complete!$(NC)"
+	@echo ""
+	@echo "$(CYAN)📋 Next Steps:$(NC)"
+	@echo "  1. Commit Soda files to GitHub: $(YELLOW)cd ~/Documents/git-projects/Fraud-Airbyte-Project && git add . && git commit -m 'Add Soda K8s' && git push$(NC)"
+	@echo "  2. Wait 60 seconds for git-sync"
+	@echo "  3. Test the DAG: $(GREEN)make test-soda-dag$(NC)"
+
+install-k8s-provider: ## Install Kubernetes provider for Airflow
+	@echo "$(YELLOW)━━━ Installing Kubernetes Provider ━━━$(NC)"
+	@if ! grep -q "apache-airflow-providers-cncf-kubernetes" requirements.txt; then \
+		echo "" >> requirements.txt; \
+		echo "# Kubernetes Provider for KubernetesPodOperator" >> requirements.txt; \
+		echo "apache-airflow-providers-cncf-kubernetes>=8.0.0" >> requirements.txt; \
+		echo "$(CYAN)  Added to requirements.txt$(NC)"; \
+		echo "$(YELLOW)  Rebuilding Airflow image...$(NC)"; \
+		$(MAKE) upgrade; \
+	else \
+		echo "$(GREEN)  ✓ Kubernetes provider already in requirements.txt$(NC)"; \
+	fi
+
+setup-soda-rbac: ## Create Kubernetes RBAC for Airflow workers
+	@echo "$(YELLOW)━━━ Setting up Kubernetes RBAC ━━━$(NC)"
+	@cat > /tmp/airflow-worker-rbac.yaml << 'EOFRBAC'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airflow-worker
+  namespace: airflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-worker-role
+  namespace: airflow
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-worker-rolebinding
+  namespace: airflow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: airflow-worker-role
+subjects:
+  - kind: ServiceAccount
+    name: airflow-worker
+    namespace: airflow
+EOFRBAC
+	@kubectl apply -f /tmp/airflow-worker-rbac.yaml
+	@rm /tmp/airflow-worker-rbac.yaml
+	@echo "$(GREEN)✓ RBAC configured$(NC)"
+
+setup-soda-vars: check-snowflake-creds ## Verify Snowflake variables are set
+	@echo "$(YELLOW)━━━ Verifying Snowflake Variables ━━━$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables list 2>/dev/null | grep -q SNOWFLAKE_ACCOUNT || \
+		(echo "$(RED)ERROR: Snowflake variables not set!$(NC)" && \
+		 echo "$(YELLOW)Run: make setup-snowflake-connection$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Snowflake variables configured$(NC)"
+
+test-soda-dag: ## Test Soda K8s DAG
+	@echo "$(YELLOW)━━━ Testing Soda K8s DAG ━━━$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Checking if DAG is loaded...$(NC)"
+	@if kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list 2>/dev/null | grep -q "fraud_detection_with_soda_k8s"; then \
+		echo "$(GREEN)  ✓ DAG found$(NC)"; \
+	else \
+		echo "$(RED)  ✗ DAG not found. Wait 60s for git-sync or check errors:$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+			airflow dags list-import-errors 2>/dev/null | grep fraud || true; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "$(CYAN)2. Checking for import errors...$(NC)"
+	@if kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list-import-errors 2>/dev/null | grep -q fraud_detection_with_soda_k8s; then \
+		echo "$(RED)  ✗ Import errors found:$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+			airflow dags list-import-errors 2>/dev/null | grep -A 10 fraud_detection_with_soda_k8s; \
+		exit 1; \
+	else \
+		echo "$(GREEN)  ✓ No import errors$(NC)"; \
+	fi
+	@echo ""
+	@echo "$(CYAN)3. Unpausing DAG...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags unpause fraud_detection_with_soda_k8s 2>/dev/null || true
+	@echo "$(GREEN)  ✓ DAG unpaused$(NC)"
+	@echo ""
+	@echo "$(CYAN)4. Triggering test run...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags trigger fraud_detection_with_soda_k8s
+	@echo "$(GREEN)  ✓ DAG triggered$(NC)"
+	@echo ""
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║              🎉 SODA K8S DAG TRIGGERED! 🎉                 ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)📊 Monitor the DAG:$(NC)"
+	@echo "  UI: $(GREEN)make port-forward$(NC) → http://localhost:8080"
+	@echo "  Pods: $(GREEN)watch kubectl get pods -n airflow$(NC)"
+	@echo "  Logs: $(GREEN)make logs-soda-check$(NC)"
+
+logs-soda-check: ## View Soda quality check logs
+	@echo "$(YELLOW)━━━ Soda Quality Check Logs ━━━$(NC)"
+	@echo ""
+	@POD=$$(kubectl get pods -n $(NAMESPACE) -l app=soda-transactions-check -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+	if [ -z "$$POD" ]; then \
+		echo "$(YELLOW)No Soda pods found yet. Trying by name pattern...$(NC)"; \
+		POD=$$(kubectl get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep soda | awk '{print $$1}' | head -1); \
+	fi; \
+	if [ -z "$$POD" ]; then \
+		echo "$(RED)No Soda pods found. DAG may not have run yet.$(NC)"; \
+		echo "$(CYAN)Try: make test-soda-dag$(NC)"; \
+	else \
+		echo "$(GREEN)Showing logs for pod: $$POD$(NC)"; \
+		kubectl logs -n $(NAMESPACE) $$POD --tail=100 -f; \
+	fi
+
+verify-k8s-provider: ## Verify Kubernetes provider is installed
+	@echo "$(YELLOW)━━━ Verifying Kubernetes Provider ━━━$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		python -c "from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator; print('$(GREEN)✓ Kubernetes provider installed$(NC)')" \
+		|| echo "$(RED)✗ Kubernetes provider NOT installed. Run: make install-k8s-provider$(NC)"
+
+verify-soda-image: ## Test if Soda Docker image is accessible
+	@echo "$(YELLOW)━━━ Testing Soda Docker Image ━━━$(NC)"
+	@kubectl run soda-test --image=sodadata/soda-core:latest --rm -i --restart=Never --namespace=$(NAMESPACE) -- soda --version \
+		&& echo "$(GREEN)✓ Soda image accessible$(NC)" \
+		|| echo "$(RED)✗ Cannot pull Soda image$(NC)"
+
+check-soda-status: ## Complete status check for Soda integration
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║           SODA K8S INTEGRATION STATUS CHECK               ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Kubernetes Provider:$(NC)"
+	@$(MAKE) verify-k8s-provider 2>&1 | grep -E "✓|✗" || true
+	@echo ""
+	@echo "$(CYAN)2. RBAC Configuration:$(NC)"
+	@kubectl get serviceaccount airflow-worker -n $(NAMESPACE) >/dev/null 2>&1 \
+		&& echo "$(GREEN)  ✓ ServiceAccount exists$(NC)" \
+		|| echo "$(RED)  ✗ ServiceAccount missing. Run: make setup-soda-rbac$(NC)"
+	@echo ""
+	@echo "$(CYAN)3. Snowflake Variables:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables list 2>/dev/null | grep -q SNOWFLAKE_ACCOUNT \
+		&& echo "$(GREEN)  ✓ Variables configured$(NC)" \
+		|| echo "$(RED)  ✗ Variables missing. Run: make setup-snowflake-connection$(NC)"
+	@echo ""
+	@echo "$(CYAN)4. DAG Status:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list 2>/dev/null | grep fraud_detection_with_soda_k8s >/dev/null 2>&1 \
+		&& echo "$(GREEN)  ✓ DAG loaded$(NC)" \
+		|| echo "$(YELLOW)  ⚠ DAG not loaded yet (wait for git-sync)$(NC)"
+	@echo ""
+	@echo "$(CYAN)5. Recent DAG Runs:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list-runs -d fraud_detection_with_soda_k8s --limit 3 2>/dev/null \
+		|| echo "$(YELLOW)  No runs yet$(NC)"
+
+soda-help: ## Show Soda integration help
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║     SODA DATA QUALITY WITH KUBERNETES - QUICK START       ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)📋 Setup Steps:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1. Complete Setup (Automated):$(NC)"
+	@echo "   $(GREEN)make setup-soda-k8s$(NC)"
+	@echo "   This will:"
+	@echo "   - Install Kubernetes provider"
+	@echo "   - Configure RBAC for pod creation"
+	@echo "   - Verify Snowflake variables"
+	@echo ""
+	@echo "$(YELLOW)2. Create Soda Files in GitHub:$(NC)"
+	@echo "   $(GREEN)cd ~/Documents/git-projects/Fraud-Airbyte-Project$(NC)"
+	@echo "   $(GREEN)# Create soda/checks/*.yml and DAG file$(NC)"
+	@echo "   $(GREEN)git add . && git commit -m 'Add Soda' && git push$(NC)"
+	@echo ""
+	@echo "$(YELLOW)3. Wait for Git-Sync (60 seconds):$(NC)"
+	@echo "   $(GREEN)sleep 60$(NC)"
+	@echo ""
+	@echo "$(YELLOW)4. Test the DAG:$(NC)"
+	@echo "   $(GREEN)make test-soda-dag$(NC)"
+	@echo ""
+	@echo "$(CYAN)🔍 Monitoring:$(NC)"
+	@echo "   Status: $(GREEN)make check-soda-status$(NC)"
+	@echo "   Logs: $(GREEN)make logs-soda-check$(NC)"
+	@echo "   UI: $(GREEN)make port-forward$(NC)"
+	@echo ""
+	@echo "$(CYAN)🧪 Testing:$(NC)"
+	@echo "   Verify provider: $(GREEN)make verify-k8s-provider$(NC)"
+	@echo "   Test Soda image: $(GREEN)make verify-soda-image$(NC)"
+
+check-snowflake-creds:
+	@if [ -z "$(SNOWFLAKE_USER)" ] || [ -z "$(SNOWFLAKE_PASSWORD)" ]; then \
+		echo "$(RED)ERROR: Snowflake credentials not set!$(NC)"; \
+		echo "$(YELLOW)Create a .env file with:$(NC)"; \
+		echo "  SNOWFLAKE_USER=your_user"; \
+		echo "  SNOWFLAKE_PASSWORD=your_password"; \
+		echo "  SNOWFLAKE_ACCOUNT=your_account"; \
+		echo "  SNOWFLAKE_WAREHOUSE=your_warehouse"; \
+		echo "  SNOWFLAKE_ROLE=your_role"; \
+		exit 1; \
+	fi
+
