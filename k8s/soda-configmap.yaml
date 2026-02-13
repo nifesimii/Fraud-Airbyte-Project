@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: soda-config
+  namespace: airflow
+data:
+  configuration.yml: |
+    data_source staging:
+      type: snowflake
+      username: ${SNOWFLAKE_USER}
+      password: ${SNOWFLAKE_PASSWORD}
+      account: ${SNOWFLAKE_ACCOUNT}
+      database: AIRBYTE_DATABASE
+      warehouse: AIRBYTE_WAREHOUSE
+      connection_timeout: 240
+      role: AIRBYTE_ROLE
+      client_session_keep_alive: true
+      session_params:
+        QUERY_TAG: soda-queries
+        QUOTED_IDENTIFIERS_IGNORE_CASE: false
+      schema: STAGING
+
+  transactions_checks.yml: |
+    # Soda Quality Checks for Fraud Detection - Transactions Table
+    checks for transactions:
+      # Completeness Checks
+      - row_count > 100:
+          name: Minimum transaction volume check
+      - missing_count(transaction_id) = 0:
+          name: Transaction ID must not be null
+      - missing_count(customer_id) = 0:
+          name: Customer ID must not be null
+      - missing_count(amount) = 0:
+          name: Amount must not be null
+      - missing_count(transaction_timestamp) = 0:
+          name: Timestamp must not be null
+
+      # Validity Checks
+      - duplicate_count(transaction_id) = 0:
+          name: Transaction IDs must be unique
+      - invalid_count(amount) = 0:
+          name: Amount must be positive and within range
+          valid min: 0.01
+          valid max: 1000000
+      - invalid_count(transaction_type) = 0:
+          name: Transaction type must be valid
+          valid values: ['purchase', 'refund', 'transfer', 'withdrawal', 'deposit']
+
+      # Freshness Check
+      - freshness(transaction_timestamp) < 1d:
+          name: Data should be less than 1 day old
+
+      # Distribution Checks
+      - avg(amount) between 10 and 5000:
+          name: Average transaction amount in expected range
+      - row_count change < 50%:
+          name: Row count should not change drastically
+
+  customers_checks.yml: |
+    # Soda Quality Checks for Fraud Detection - Customers Table
+    checks for customers:
+      # Completeness
+      - missing_count(customer_id) = 0
+      - missing_count(email) = 0
+
+      # Validity
+      - invalid_count(email) = 0:
+          valid format: email
+      - duplicate_count(customer_id) = 0
+      - duplicate_count(email) = 0
+
+      # Schema Check
+      - schema:
+          warn:
+            when required column missing:
+              - customer_id
+              - email
+              - first_name
+              - last_name
+          fail:
+            when forbidden column present:
+              - ssn
+              - credit_card

@@ -1,17 +1,21 @@
 """
 Fraud Detection Pipeline with Soda Data Quality Checks (KubernetesPodOperator)
 
-Soda checks run in isolated pods using config mounted from the soda-config ConfigMap.
-Soda files live in: soda/configuration.yml and soda/checks/*.yml
-ConfigMap defined in: k8s/soda-configmap.yaml
+- Airbyte Cloud syncs triggered via REST API (no airbyte provider needed)
+- Soda checks run in isolated K8s pods with config mounted from ConfigMap
+- Soda files: soda/configuration.yml, soda/checks/*.yml
+- ConfigMap: k8s/soda-configmap.yaml
 """
 
 from datetime import datetime, timedelta
+import json
+
 from airflow.sdk import DAG
-from airflow.providers.airbyte.operators.airbyte import AirbyteTriggerSyncOperator
-from airflow.providers.airbyte.sensors.airbyte import AirbyteJobSensor
+from airflow.providers.http.operators.http import HttpOperator
+from airflow.providers.http.sensors.http import HttpSensor
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from kubernetes.client import models as k8s
+
 
 # ===================================================================
 # Shared K8s volume config for mounting Soda ConfigMap
@@ -86,22 +90,36 @@ with DAG(
 ) as dag:
 
     # -----------------------------------------------------------------
-    # STEP 1: Trigger Airbyte sync
+    # STEP 1: Trigger Airbyte Cloud sync via REST API
     # -----------------------------------------------------------------
-    sync_transactions = AirbyteTriggerSyncOperator(
-        task_id="sync_fraud_sources",
-        airbyte_conn_id="airbyte_cloud",
-        connection_id="{{ var.value.airbyte_mysql_connection_id }}",
-        asynchronous=True,
+    # Requires Airflow HTTP connection 'airbyte_cloud' with:
+    #   Host: https://api.airbyte.com
+    #   Extra: {"Authorization": "Bearer <your-api-key>"}
+    # And Airflow variable: airbyte_connection_id
+    # -----------------------------------------------------------------
+    trigger_airbyte_sync = HttpOperator(
+        task_id="trigger_airbyte_sync",
+        http_conn_id="airbyte_cloud",
+        endpoint="/v1/jobs",
+        method="POST",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps({
+            "connectionId": "{{ var.value.airbyte_connection_id }}",
+            "jobType": "sync",
+        }),
+        response_filter=lambda response: response.json()["jobId"],
+        log_response=True,
     )
 
     # -----------------------------------------------------------------
-    # STEP 2: Wait for Airbyte sync to complete
+    # STEP 2: Wait for Airbyte Cloud sync to complete
     # -----------------------------------------------------------------
-    wait_for_sync = AirbyteJobSensor(
+    wait_for_sync = HttpSensor(
         task_id="wait_for_sync",
-        airbyte_conn_id="airbyte_cloud",
-        airbyte_job_id="{{ task_instance.xcom_pull(task_ids='sync_fraud_sources') }}",
+        http_conn_id="airbyte_cloud",
+        endpoint="/v1/jobs/{{ task_instance.xcom_pull(task_ids='trigger_airbyte_sync') }}",
+        method="GET",
+        response_check=lambda response: response.json()["status"] in ["succeeded", "failed"],
         poke_interval=30,
         timeout=3600,
     )
@@ -131,4 +149,4 @@ with DAG(
     # -----------------------------------------------------------------
     # STEP 4: Pipeline dependencies
     # -----------------------------------------------------------------
-    sync_transactions >> wait_for_sync >> [soda_check_transactions, soda_check_customers]
+    trigger_airbyte_sync >> wait_for_sync >> [soda_check_transactions, soda_check_customers]

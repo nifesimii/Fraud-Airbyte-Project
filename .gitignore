@@ -28,6 +28,9 @@ airflow.cfg
 logs/
 plugins/
 unittests.cfg
+.airflow-image-tag
+*.pyc
+__pycache__/
 
 # Secrets (DO NOT COMMIT)
 secrets/
@@ -35,4 +38,8 @@ secrets/
 *.key
 *.crt
 airbyte-secrets.yaml
+.env
+**/.env
+deployments/airflow/.env
 11:~$ ssh ubuntu@54.91.45.100 "netstat -tlnp | grep 5433"
+

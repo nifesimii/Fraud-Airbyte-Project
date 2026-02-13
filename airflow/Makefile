@@ -224,12 +224,12 @@ install-phpmyadmin: ## Install phpMyAdmin (for MySQL)
 	@kubectl wait --for=condition=ready pod -l app=phpmyadmin -n $(NAMESPACE) --timeout=300s
 	@echo "$(GREEN)✓ phpMyAdmin installed$(NC)"
 
-install-airbyte-secrets: ## Install Airbyte secrets
-	@echo "$(YELLOW)━━━ Installing Airbyte Secrets ━━━$(NC)"
-	@kubectl apply -f ../k8s/secrets/airbyte-secrets.yaml
-	@echo "$(GREEN)✓ Airbyte secrets created$(NC)"
+# install-airbyte-secrets: ## Install Airbyte secrets
+# 	@echo "$(YELLOW)━━━ Installing Airbyte Secrets ━━━$(NC)"
+# 	@kubectl apply -f ../k8s/secrets/airbyte-secrets.yaml
+# 	@echo "$(GREEN)✓ Airbyte secrets created$(NC)"
 
-install-all-components: install-mysql install-postgres-source install-pgadmin install-phpmyadmin install-airbyte-secrets ## Install all additional components
+install-all-components: install-mysql install-postgres-source install-pgadmin install-phpmyadmin ## Install all additional components
 	@echo "$(GREEN)✓ All components installed$(NC)"
 
 # ============================================================================
@@ -336,14 +336,41 @@ unpause: ## Unpause DAG (usage: make unpause DAG=my_dag)
 # CONNECTIONS
 # ============================================================================
 
-add-airbyte-conn: ## Add Airbyte Cloud connection
-	@echo "$(YELLOW)Adding Airbyte connection...$(NC)"
+add-airbyte-conn: ## Add Airbyte Cloud connection (HTTP API)
+	@echo "$(YELLOW)Adding Airbyte Cloud connection...$(NC)"
+	@if [ -z "$(AIRBYTE_ACCESS_TOKEN)" ] || [ -z "$(AIRBYTE_CLIENT_SECRET)" ]; then \
+		echo "$(RED)ERROR: Missing Airbyte credentials!$(NC)"; \
+		echo "$(YELLOW)Required in .env: AIRBYTE_ACCESS_TOKEN, AIRBYTE_CLIENT_SECRET$(NC)"; \
+		exit 1; \
+	fi
 	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
 		airflow connections add airbyte_cloud \
-		--conn-type airbyte \
-		--conn-host https://api.airbyte.com/v1 \
-		--conn-password "$$(kubectl get secret airbyte-secrets -n $(NAMESPACE) -o jsonpath='{.data.AIRBYTE_API_KEY}' | base64 -d)" 2>/dev/null || echo "  Connection already exists"
-	@echo "$(GREEN)✓ Airbyte connection added$(NC)"
+		--conn-type http \
+		--conn-host https://api.airbyte.com \
+		--conn-extra '{ \
+			"client_id": "$(AIRBYTE_ACCESS_TOKEN)", \
+			"client_secret": "$(AIRBYTE_CLIENT_SECRET)", \
+			"connection_id": "$(AIRBYTE_CONNECTION_ID)", \
+			"workspace_id": "$(AIRBYTE_WORKSPACE_ID)" \
+		}' \
+		2>/dev/null || echo "  Connection already exists"
+	@echo "$(GREEN)✓ Airbyte Cloud connection added$(NC)"
+
+add-airbyte-vars: ## Set Airbyte Cloud connection ID variables
+	@echo "$(YELLOW)Setting Airbyte variables...$(NC)"
+	@if [ -z "$(AIRBYTE_CONN_POSTGRES_S3)" ] || [ -z "$(AIRBYTE_CONN_MYSQL_S3)" ] || [ -z "$(AIRBYTE_CONN_S3_SNOWFLAKE)" ]; then \
+		echo "$(RED)ERROR: Missing Airbyte connection IDs!$(NC)"; \
+		echo "$(YELLOW)Required in .env: AIRBYTE_CONN_POSTGRES_S3, AIRBYTE_CONN_MYSQL_S3, AIRBYTE_CONN_S3_SNOWFLAKE$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_conn_postgres_s3 "$(AIRBYTE_CONN_POSTGRES_S3)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_conn_mysql_s3 "$(AIRBYTE_CONN_MYSQL_S3)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_conn_s3_snowflake "$(AIRBYTE_CONN_S3_SNOWFLAKE)"
+	@echo "$(GREEN)✓ Airbyte connection ID variables set$(NC)"
+
 
 add-mysql-conn: ## Add MySQL connection
 	@echo "$(YELLOW)Adding MySQL connection...$(NC)"
@@ -398,8 +425,7 @@ list-connections: ## List all connections
 	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
 		airflow connections list
 
-setup-connections: add-airbyte-conn add-mysql-conn add-postgres-source-conn setup-snowflake-connection ## Setup all connections
-
+setup-connections: add-airbyte-conn add-airbyte-vars add-mysql-conn add-postgres-source-conn setup-snowflake-connection
 # ============================================================================
 # TESTING
 # ============================================================================
@@ -445,7 +471,6 @@ uninstall-components: ## Uninstall additional components
 	@kubectl delete -f ../k8s/postgres-source-deployment.yaml 2>/dev/null || true
 	@kubectl delete -f ../k8s/pgadmin-deployment.yaml 2>/dev/null || true
 	@kubectl delete -f ../k8s/phpmyadmin-deployment.yaml 2>/dev/null || true
-	@kubectl delete -f ../k8s/secrets/airbyte-secrets.yaml 2>/dev/null || true
 	@echo "$(GREEN)✓ Components uninstalled$(NC)"
 
 reinstall: uninstall all ## Complete reinstall
@@ -700,43 +725,10 @@ install-k8s-provider: ## Install Kubernetes provider for Airflow
 
 setup-soda-rbac: ## Create Kubernetes RBAC for Airflow workers
 	@echo "$(YELLOW)━━━ Setting up Kubernetes RBAC ━━━$(NC)"
-	@cat > /tmp/airflow-worker-rbac.yaml << 'EOFRBAC'
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: airflow-worker
-  namespace: airflow
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: airflow-worker-role
-  namespace: airflow
-rules:
-  - apiGroups: [""]
-    resources: ["pods", "pods/log"]
-    verbs: ["create", "get", "list", "watch", "delete", "patch"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create", "get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: airflow-worker-rolebinding
-  namespace: airflow
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: airflow-worker-role
-subjects:
-  - kind: ServiceAccount
-    name: airflow-worker
-    namespace: airflow
-EOFRBAC
-	@kubectl apply -f /tmp/airflow-worker-rbac.yaml
-	@rm /tmp/airflow-worker-rbac.yaml
+	@kubectl apply -f ../k8s/airflow-worker-rbac.yaml
 	@echo "$(GREEN)✓ RBAC configured$(NC)"
+
+
 
 setup-soda-vars: check-snowflake-creds ## Verify Snowflake variables are set
 	@echo "$(YELLOW)━━━ Verifying Snowflake Variables ━━━$(NC)"
