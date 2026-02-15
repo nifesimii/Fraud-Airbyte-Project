@@ -2,24 +2,22 @@
 Fraud Detection Pipeline with Soda Data Quality Checks (KubernetesPodOperator)
 
 - Airbyte Cloud syncs triggered via REST API (no airbyte provider needed)
+- Fresh Airbyte access token fetched at runtime via client_credentials grant
 - Soda checks run in isolated K8s pods with config mounted from ConfigMap
 - Soda files: soda/configuration.yml, soda/checks/*.yml
 - ConfigMap: k8s/soda-configmap.yaml
 
-Credentials are loaded from environment variables.
-Set them in your Airflow deployment via:
-  - A .env file loaded by docker-compose (env_file directive)
-  - Or export them in the Airflow worker/scheduler environment
-  - Or set them in your Helm values (extraEnv / extraEnvFrom)
+Credentials are loaded from environment variables (via K8s Secret "airbyte-secrets").
 """
 
 import os
+import requests
 from datetime import datetime, timedelta
 import json
+import time
 
 from airflow.sdk import DAG
-from airflow.providers.http.operators.http import HttpOperator
-from airflow.providers.http.sensors.http import HttpSensor
+from airflow.operators.python import PythonOperator
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from kubernetes.client import models as k8s
 
@@ -34,11 +32,95 @@ SNOWFLAKE_DATABASE = os.environ["SNOWFLAKE_DATABASE"]
 SNOWFLAKE_WAREHOUSE = os.environ["SNOWFLAKE_WAREHOUSE"]
 SNOWFLAKE_ROLE = os.environ["SNOWFLAKE_ROLE"]
 
-AIRBYTE_ACCESS_TOKEN = os.environ["AIRBYTE_ACCESS_TOKEN"]
+AIRBYTE_CLIENT_ID = os.environ["AIRBYTE_CLIENT_ID"]
+AIRBYTE_CLIENT_SECRET = os.environ["AIRBYTE_CLIENT_SECRET"]
 AIRBYTE_CONN_ID = os.environ.get(
     "AIRBYTE_CONNECTION_ID",
     os.environ.get("AIRBYTE_CONN_S3_SNOWFLAKE", ""),
 )
+
+AIRBYTE_API_BASE = "https://api.airbyte.com"
+
+
+# ===================================================================
+# Helper: fetch a fresh Airbyte access token using client credentials
+# ===================================================================
+def fetch_airbyte_token(**context):
+    """
+    Exchange client_id + client_secret for a short-lived access token.
+    Pushes the token to XCom so downstream tasks can use it.
+    """
+    response = requests.post(
+        f"{AIRBYTE_API_BASE}/v1/applications/token",
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json={
+            "client_id": AIRBYTE_CLIENT_ID,
+            "client_secret": AIRBYTE_CLIENT_SECRET,
+            "grant-type": "client_credentials",
+        },
+    )
+    response.raise_for_status()
+    token = response.json()["access_token"]
+    context["ti"].xcom_push(key="airbyte_token", value=token)
+    return token
+
+
+# ===================================================================
+# Helper: trigger Airbyte sync using the fresh token
+# ===================================================================
+def trigger_sync(**context):
+    """Trigger an Airbyte Cloud sync job and return the job ID."""
+    token = context["ti"].xcom_pull(task_ids="get_airbyte_token", key="airbyte_token")
+    response = requests.post(
+        f"{AIRBYTE_API_BASE}/v1/jobs",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "connectionId": AIRBYTE_CONN_ID,
+            "jobType": "sync",
+        },
+    )
+    response.raise_for_status()
+    job_id = response.json()["jobId"]
+    context["ti"].xcom_push(key="airbyte_job_id", value=str(job_id))
+    return job_id
+
+
+# ===================================================================
+# Helper: poll Airbyte job until completion
+# ===================================================================
+def wait_for_sync_completion(**context):
+    """Poll Airbyte job status until succeeded or failed."""
+    token = context["ti"].xcom_pull(task_ids="get_airbyte_token", key="airbyte_token")
+    job_id = context["ti"].xcom_pull(task_ids="trigger_airbyte_sync", key="airbyte_job_id")
+
+    timeout = 3600  # 1 hour
+    poke_interval = 30
+    elapsed = 0
+
+    while elapsed < timeout:
+        response = requests.get(
+            f"{AIRBYTE_API_BASE}/v1/jobs/{job_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        response.raise_for_status()
+        status = response.json()["status"]
+        print(f"Airbyte job {job_id} status: {status}")
+
+        if status == "succeeded":
+            return status
+        elif status == "failed":
+            raise Exception(f"Airbyte sync job {job_id} failed!")
+
+        time.sleep(poke_interval)
+        elapsed += poke_interval
+
+    raise TimeoutError(f"Airbyte sync job {job_id} timed out after {timeout}s")
 
 
 # ===================================================================
@@ -55,7 +137,6 @@ soda_volume_mount = k8s.V1VolumeMount(
     read_only=True,
 )
 
-# These env vars are passed into the Soda K8s pods so soda can connect to Snowflake
 SNOWFLAKE_ENV_VARS = {
     "SNOWFLAKE_ACCOUNT": SNOWFLAKE_ACCOUNT,
     "SNOWFLAKE_USER": SNOWFLAKE_USER,
@@ -115,49 +196,31 @@ with DAG(
 ) as dag:
 
     # -----------------------------------------------------------------
-    # STEP 1: Trigger Airbyte Cloud sync via REST API
+    # STEP 1: Get a fresh Airbyte access token
     # -----------------------------------------------------------------
-    # Uses the Airbyte access token directly from env vars.
-    # No Airflow HTTP connection needed — headers are set inline.
+    get_airbyte_token = PythonOperator(
+        task_id="get_airbyte_token",
+        python_callable=fetch_airbyte_token,
+    )
+
     # -----------------------------------------------------------------
-    trigger_airbyte_sync = HttpOperator(
+    # STEP 2: Trigger Airbyte Cloud sync
+    # -----------------------------------------------------------------
+    trigger_airbyte_sync = PythonOperator(
         task_id="trigger_airbyte_sync",
-        http_conn_id="airbyte_cloud",
-        endpoint="/v1/jobs",
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {AIRBYTE_ACCESS_TOKEN}",
-        },
-        data=json.dumps({
-            "connectionId": AIRBYTE_CONN_ID,
-            "jobType": "sync",
-        }),
-        response_filter=lambda response: response.json()["jobId"],
-        log_response=True,
+        python_callable=trigger_sync,
     )
 
     # -----------------------------------------------------------------
-    # STEP 2: Wait for Airbyte Cloud sync to complete
+    # STEP 3: Wait for Airbyte sync to complete
     # -----------------------------------------------------------------
-    wait_for_sync = HttpSensor(
+    wait_for_sync = PythonOperator(
         task_id="wait_for_sync",
-        http_conn_id="airbyte_cloud",
-        endpoint="/v1/jobs/{{ task_instance.xcom_pull(task_ids='trigger_airbyte_sync') }}",
-        method="GET",
-        headers={
-            "Authorization": f"Bearer {AIRBYTE_ACCESS_TOKEN}",
-        },
-        response_check=lambda response: response.json()["status"] in [
-            "succeeded",
-            "failed",
-        ],
-        poke_interval=30,
-        timeout=3600,
+        python_callable=wait_for_sync_completion,
     )
 
     # -----------------------------------------------------------------
-    # STEP 3a: Soda quality checks — Transactions
+    # STEP 4a: Soda quality checks — Transactions
     # -----------------------------------------------------------------
     soda_check_transactions = KubernetesPodOperator(
         task_id="soda_quality_check_transactions",
@@ -168,7 +231,7 @@ with DAG(
     )
 
     # -----------------------------------------------------------------
-    # STEP 3b: Soda quality checks — Customers
+    # STEP 4b: Soda quality checks — Customers
     # -----------------------------------------------------------------
     soda_check_customers = KubernetesPodOperator(
         task_id="soda_quality_check_customers",
@@ -179,9 +242,9 @@ with DAG(
     )
 
     # -----------------------------------------------------------------
-    # STEP 4: Pipeline dependencies
+    # STEP 5: Pipeline dependencies
     # -----------------------------------------------------------------
-    trigger_airbyte_sync >> wait_for_sync >> [
+    get_airbyte_token >> trigger_airbyte_sync >> wait_for_sync >> [
         soda_check_transactions,
         soda_check_customers,
     ]
