@@ -1,4 +1,4 @@
-.PHONY: help all clean build install wait-postgres migrate create-session patch-deployments wait-components status port-forward
+.PHONY: help all clean build install wait-postgres migrate create-session patch-deployments wait-components status port-forward fix-log-permissions
 
 # Configuration
 AIRFLOW_VERSION := 3.0.2
@@ -38,12 +38,13 @@ help: ## Show this help message
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-30s$(NC) %s\n", $$1, $$2}'
 
-all: clean build create-k8s-resources install wait-postgres migrate create-session patch-deployments wait-components install-all-components status ## Complete installation
+all: clean build create-k8s-resources install wait-postgres migrate create-session patch-deployments wait-components install-all-components setup-connections status ## Complete installation
 
 clean: ## Clean up existing installation
 	@echo "$(YELLOW)━━━ STEP 1: Cleanup ━━━$(NC)"
 	@helm uninstall airflow -n $(NAMESPACE) 2>/dev/null || true
 	@kubectl delete namespace $(NAMESPACE) --force --grace-period=0 2>/dev/null || true
+	@rdctl shell sudo rm -rf /tmp/airflow-logs 2>/dev/null || true
 	@sleep 5
 	@echo "$(GREEN)✓ Clean environment$(NC)"
 
@@ -75,10 +76,17 @@ create-namespace: ## Create namespace
 	@kubectl create namespace $(NAMESPACE) 2>/dev/null || true
 	@echo "$(GREEN)✓ Namespace: $(NAMESPACE)$(NC)"
 
-create-k8s-resources: create-namespace ## Create K8s resources
+create-k8s-resources: create-namespace fix-log-permissions ## Create K8s resources
 	@echo "$(YELLOW)━━━ STEP 6: Create K8s Resources ━━━$(NC)"
 	@kubectl apply -f ../k8s/secrets/git-secrets.yaml 2>/dev/null || true
 	@echo "$(GREEN)✓ Secrets created$(NC)"
+
+fix-log-permissions: ## Fix hostPath log volume permissions (Rancher Desktop)
+	@echo "$(YELLOW)━━━ Fixing Log Volume Permissions ━━━$(NC)"
+	@rdctl shell sudo mkdir -p /tmp/airflow-logs
+	@rdctl shell sudo chown -R 50000:0 /tmp/airflow-logs
+	@rdctl shell sudo chmod -R 775 /tmp/airflow-logs
+	@echo "$(GREEN)✓ Log volume permissions fixed$(NC)"
 
 install: pull-postgres update-values setup-helm create-k8s-resources ## Install Airflow
 	@echo "$(YELLOW)━━━ STEP 7: Install Airflow $(AIRFLOW_VERSION) ━━━$(NC)"
@@ -885,4 +893,3 @@ check-snowflake-creds:
 		echo "  SNOWFLAKE_ROLE=your_role"; \
 		exit 1; \
 	fi
-

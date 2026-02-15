@@ -1,3 +1,95 @@
+# executor: "KubernetesExecutor"
+# cleanUpPods: false
+
+# images:
+#   airflow:
+#     repository: my-dags
+#     tag: "20260131164649"
+#     pullPolicy: IfNotPresent
+#   gitSync:
+#     repository: registry.k8s.io/git-sync/git-sync
+#     tag: v3.3.0
+#     pullPolicy: IfNotPresent
+
+# scheduler:
+#   replicas: 1
+
+# triggerer:
+#   replicas: 1
+
+# workers:
+#   replicas: 0
+
+# redis:
+#   enabled: false
+
+# postgresql:
+#   enabled: true
+#   image:
+#     registry: docker.io
+#     repository: bitnamilegacy/postgresql
+#     tag: "14.10.0"
+#     pullPolicy: IfNotPresent
+#   auth:
+#     enablePostgresUser: true
+#     postgresPassword: postgres
+#   primary:
+#     persistence:
+#       enabled: false
+
+# logs:
+#   persistence:
+#     enabled: false # ← Change from false to true
+#     existingClaim: airflow-logs # ← Add this to use your PVC
+
+# dags:
+#   persistence:
+#     enabled: false
+#   gitSync:
+#     enabled: true
+#     repo: https://github.com/nifesimii/Fraud-Airbyte-Project.git
+#     branch: main
+#     subPath: "airflow/dags"
+#     wait: 60
+
+# config:
+#   core:
+#     load_examples: "False"
+#     # ✅ ADD THIS - Tell Airflow to ignore git-sync directories
+#     dagbag_import_error_tracebacks: "False"
+#     dagbag_import_error_traceback_depth: "2"
+#   scheduler:
+#     # ✅ ADD THIS - Ignore patterns for DAG discovery
+#     ignore_first_depends_on_past_by_default: "True"
+#   webserver:
+#     expose_config: "True"
+#   kubernetes_executor:
+#     delete_worker_pods: "False"
+#     delete_worker_pods_on_failure: "False"
+#   logging:
+#     base_log_folder: "/opt/airflow/logs"
+#     remote_logging: "False"
+#     logging_level: "INFO"
+#     fab_logging_level: "WARNING"
+#     log_filename_template: "{{`{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log`}}"
+#     log_processor_filename_template: "{{`{{ filename }}.log`}}"
+#     dag_processor_manager_log_location: "/opt/airflow/logs/dag_processor_manager/dag_processor_manager.log"
+#     task_log_reader: "task"
+#     logging_config_class: ""
+
+# env:
+#   - name: AIRFLOW__CORE__DAGS_FOLDER
+#     value: "/opt/airflow/dags/repo/airflow/dags" # ← Fixed path
+#   - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
+#     value: "/opt/airflow/logs"
+#   - name: AIRFLOW__LOGGING__TASK_LOG_READER
+#     value: "task"
+#   - name: AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE
+#     value: "True"
+
+
+
+
 executor: "KubernetesExecutor"
 cleanUpPods: false
 
@@ -6,10 +98,13 @@ images:
     repository: my-dags
     tag: "20260131164649"
     pullPolicy: IfNotPresent
-  gitSync:
-    repository: registry.k8s.io/git-sync/git-sync
-    tag: v3.3.0
-    pullPolicy: IfNotPresent
+
+securityContexts:
+  pod:
+    fsGroup: 0
+  containers:
+    runAsUser: 50000
+    runAsGroup: 0
 
 scheduler:
   replicas: 1
@@ -39,8 +134,8 @@ postgresql:
 
 logs:
   persistence:
-    enabled: false  # ← Change from false to true
-    existingClaim: airflow-logs  # ← Add this to use your PVC
+    enabled: true
+    existingClaim: airflow-logs
 
 dags:
   persistence:
@@ -51,19 +146,20 @@ dags:
     branch: main
     subPath: "airflow/dags"
     wait: 60
+    rev: HEAD
+    depth: 1
+    maxFailures: 0
 
 config:
   core:
     load_examples: "False"
-    # ✅ ADD THIS - Tell Airflow to ignore git-sync directories
     dagbag_import_error_tracebacks: "False"
     dagbag_import_error_traceback_depth: "2"
   scheduler:
-    # ✅ ADD THIS - Ignore patterns for DAG discovery
     ignore_first_depends_on_past_by_default: "True"
   webserver:
     expose_config: "True"
-  kubernetes:
+  kubernetes_executor:
     delete_worker_pods: "False"
     delete_worker_pods_on_failure: "False"
   logging:
@@ -71,18 +167,27 @@ config:
     remote_logging: "False"
     logging_level: "INFO"
     fab_logging_level: "WARNING"
-    log_filename_template: "{{`{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log`}}"
-    log_processor_filename_template: "{{`{{ filename }}.log`}}"
-    dag_processor_manager_log_location: "/opt/airflow/logs/dag_processor_manager/dag_processor_manager.log"
-    task_log_reader: "file.task"
-    logging_config_class: ""
+
+extraInitContainers: |
+  - name: fix-log-permissions
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 50000:0 /opt/airflow/logs && chmod -R 775 /opt/airflow/logs"]
+    securityContext:
+      runAsUser: 0
+    volumeMounts:
+      - name: logs
+        mountPath: /opt/airflow/logs
+
+# ======================================================================
+# Inject all keys from airbyte-secrets as env vars into every Airflow pod
+# (scheduler, webserver, triggerer, KubernetesExecutor worker pods)
+# ======================================================================
+extraEnvFrom: |
+  - secretRef:
+      name: airbyte-secrets
 
 env:
-  - name: AIRFLOW__CORE__DAGS_FOLDER
-    value: "/opt/airflow/dags/repo/airflow/dags"  # ← Fixed path
-  - name: AIRFLOW__LOGGING__BASE_LOG_FOLDER
-    value: "/opt/airflow/logs"
-  - name: AIRFLOW__LOGGING__TASK_LOG_READER
-    value: "file.task"
-  - name: AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE
-    value: "True"
+  - name: AIRFLOW_CONN_POSTGRES_SOURCE
+    value: "postgresql://postgres:postgres@postgres-source.airflow.svc.cluster.local:5432/postgres"
+  - name: AIRFLOW_CONN_AIRBYTE_CLOUD
+    value: "http://https%3A%2F%2Fapi.airbyte.com"

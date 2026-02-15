@@ -5,8 +5,15 @@ Fraud Detection Pipeline with Soda Data Quality Checks (KubernetesPodOperator)
 - Soda checks run in isolated K8s pods with config mounted from ConfigMap
 - Soda files: soda/configuration.yml, soda/checks/*.yml
 - ConfigMap: k8s/soda-configmap.yaml
+
+Credentials are loaded from environment variables.
+Set them in your Airflow deployment via:
+  - A .env file loaded by docker-compose (env_file directive)
+  - Or export them in the Airflow worker/scheduler environment
+  - Or set them in your Helm values (extraEnv / extraEnvFrom)
 """
 
+import os
 from datetime import datetime, timedelta
 import json
 
@@ -15,6 +22,23 @@ from airflow.providers.http.operators.http import HttpOperator
 from airflow.providers.http.sensors.http import HttpSensor
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from kubernetes.client import models as k8s
+
+
+# ===================================================================
+# Load credentials from environment variables
+# ===================================================================
+SNOWFLAKE_ACCOUNT = os.environ["SNOWFLAKE_ACCOUNT"]
+SNOWFLAKE_USER = os.environ["SNOWFLAKE_USER"]
+SNOWFLAKE_PASSWORD = os.environ["SNOWFLAKE_PASSWORD"]
+SNOWFLAKE_DATABASE = os.environ["SNOWFLAKE_DATABASE"]
+SNOWFLAKE_WAREHOUSE = os.environ["SNOWFLAKE_WAREHOUSE"]
+SNOWFLAKE_ROLE = os.environ["SNOWFLAKE_ROLE"]
+
+AIRBYTE_ACCESS_TOKEN = os.environ["AIRBYTE_ACCESS_TOKEN"]
+AIRBYTE_CONN_ID = os.environ.get(
+    "AIRBYTE_CONNECTION_ID",
+    os.environ.get("AIRBYTE_CONN_S3_SNOWFLAKE", ""),
+)
 
 
 # ===================================================================
@@ -31,13 +55,14 @@ soda_volume_mount = k8s.V1VolumeMount(
     read_only=True,
 )
 
+# These env vars are passed into the Soda K8s pods so soda can connect to Snowflake
 SNOWFLAKE_ENV_VARS = {
-    "SNOWFLAKE_ACCOUNT": "{{ var.value.SNOWFLAKE_ACCOUNT }}",
-    "SNOWFLAKE_USER": "{{ var.value.SNOWFLAKE_USER }}",
-    "SNOWFLAKE_PASSWORD": "{{ var.value.SNOWFLAKE_PASSWORD }}",
-    "SNOWFLAKE_DATABASE": "{{ var.value.SNOWFLAKE_DATABASE }}",
-    "SNOWFLAKE_WAREHOUSE": "{{ var.value.SNOWFLAKE_WAREHOUSE }}",
-    "SNOWFLAKE_ROLE": "{{ var.value.SNOWFLAKE_ROLE }}",
+    "SNOWFLAKE_ACCOUNT": SNOWFLAKE_ACCOUNT,
+    "SNOWFLAKE_USER": SNOWFLAKE_USER,
+    "SNOWFLAKE_PASSWORD": SNOWFLAKE_PASSWORD,
+    "SNOWFLAKE_DATABASE": SNOWFLAKE_DATABASE,
+    "SNOWFLAKE_WAREHOUSE": SNOWFLAKE_WAREHOUSE,
+    "SNOWFLAKE_ROLE": SNOWFLAKE_ROLE,
 }
 
 SODA_POD_DEFAULTS = dict(
@@ -92,19 +117,20 @@ with DAG(
     # -----------------------------------------------------------------
     # STEP 1: Trigger Airbyte Cloud sync via REST API
     # -----------------------------------------------------------------
-    # Requires Airflow HTTP connection 'airbyte_cloud' with:
-    #   Host: https://api.airbyte.com
-    #   Extra: {"Authorization": "Bearer <your-api-key>"}
-    # And Airflow variable: airbyte_connection_id
+    # Uses the Airbyte access token directly from env vars.
+    # No Airflow HTTP connection needed — headers are set inline.
     # -----------------------------------------------------------------
     trigger_airbyte_sync = HttpOperator(
         task_id="trigger_airbyte_sync",
         http_conn_id="airbyte_cloud",
         endpoint="/v1/jobs",
         method="POST",
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {AIRBYTE_ACCESS_TOKEN}",
+        },
         data=json.dumps({
-            "connectionId": "{{ var.value.airbyte_connection_id }}",
+            "connectionId": AIRBYTE_CONN_ID,
             "jobType": "sync",
         }),
         response_filter=lambda response: response.json()["jobId"],
@@ -119,7 +145,13 @@ with DAG(
         http_conn_id="airbyte_cloud",
         endpoint="/v1/jobs/{{ task_instance.xcom_pull(task_ids='trigger_airbyte_sync') }}",
         method="GET",
-        response_check=lambda response: response.json()["status"] in ["succeeded", "failed"],
+        headers={
+            "Authorization": f"Bearer {AIRBYTE_ACCESS_TOKEN}",
+        },
+        response_check=lambda response: response.json()["status"] in [
+            "succeeded",
+            "failed",
+        ],
         poke_interval=30,
         timeout=3600,
     )
@@ -149,4 +181,7 @@ with DAG(
     # -----------------------------------------------------------------
     # STEP 4: Pipeline dependencies
     # -----------------------------------------------------------------
-    trigger_airbyte_sync >> wait_for_sync >> [soda_check_transactions, soda_check_customers]
+    trigger_airbyte_sync >> wait_for_sync >> [
+        soda_check_transactions,
+        soda_check_customers,
+    ]
