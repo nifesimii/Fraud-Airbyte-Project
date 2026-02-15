@@ -53,6 +53,9 @@ build: ## Build Airflow Docker image
 	@docker build -t $(IMAGE_NAME):$(IMAGE_TAG) -f ../cicd/Dockerfile .
 	@echo $(IMAGE_TAG) > .airflow-image-tag
 	@echo "$(GREEN)✓ Built: $(IMAGE_NAME):$(IMAGE_TAG)$(NC)"
+	@echo "$(YELLOW)━━━ Build Soda Image (ARM) ━━━$(NC)"
+	@docker build -t soda-core-arm:latest -f ../cicd/Dockerfile.soda .
+	@echo "$(GREEN)✓ Built: soda-core-arm:latest$(NC)"
 
 pull-postgres: ## Pull PostgreSQL image
 	@echo "$(YELLOW)━━━ STEP 3: Pull PostgreSQL Image ━━━$(NC)"
@@ -79,7 +82,10 @@ create-namespace: ## Create namespace
 create-k8s-resources: create-namespace fix-log-permissions ## Create K8s resources
 	@echo "$(YELLOW)━━━ STEP 6: Create K8s Resources ━━━$(NC)"
 	@kubectl apply -f ../k8s/secrets/git-secrets.yaml 2>/dev/null || true
-	@echo "$(GREEN)✓ Secrets created$(NC)"
+	@kubectl apply -f ../k8s/secrets/airbyte-secrets.yaml
+	@kubectl apply -f ../k8s/airflow-logs.yaml
+	@kubectl apply -f ../k8s/soda-configmap.yaml
+	@echo "$(GREEN)✓ Secrets, storage, and configs created$(NC)"
 
 fix-log-permissions: ## Fix hostPath log volume permissions (Rancher Desktop)
 	@echo "$(YELLOW)━━━ Fixing Log Volume Permissions ━━━$(NC)"

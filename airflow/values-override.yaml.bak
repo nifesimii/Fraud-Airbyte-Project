@@ -87,6 +87,9 @@
 #   - name: AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE
 #     value: "True"
 
+
+
+
 executor: "KubernetesExecutor"
 cleanUpPods: false
 
@@ -95,8 +98,13 @@ images:
     repository: my-dags
     tag: "20260131164649"
     pullPolicy: IfNotPresent
-  # DO NOT override gitSync image - let the chart use its default v4.3.0
-  # v3.3.0 is incompatible with Helm chart 1.18.0's generated flags
+
+securityContexts:
+  pod:
+    fsGroup: 0
+  containers:
+    runAsUser: 50000
+    runAsGroup: 0
 
 scheduler:
   replicas: 1
@@ -126,8 +134,9 @@ postgresql:
 
 logs:
   persistence:
-    enabled: false
-    # size: 5Gi
+    enabled: true
+    existingClaim: airflow-logs
+
 dags:
   persistence:
     enabled: false
@@ -137,7 +146,6 @@ dags:
     branch: main
     subPath: "airflow/dags"
     wait: 60
-    # v4-specific options to prevent recursive loop issues
     rev: HEAD
     depth: 1
     maxFailures: 0
@@ -156,13 +164,30 @@ config:
     delete_worker_pods_on_failure: "False"
   logging:
     base_log_folder: "/opt/airflow/logs"
-    remote_logging: "True"
+    remote_logging: "False"
     logging_level: "INFO"
     fab_logging_level: "WARNING"
 
-extraEnvVars:
+extraInitContainers: |
+  - name: fix-log-permissions
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 50000:0 /opt/airflow/logs && chmod -R 775 /opt/airflow/logs"]
+    securityContext:
+      runAsUser: 0
+    volumeMounts:
+      - name: logs
+        mountPath: /opt/airflow/logs
+
+# ======================================================================
+# Inject all keys from airbyte-secrets as env vars into every Airflow pod
+# (scheduler, webserver, triggerer, KubernetesExecutor worker pods)
+# ======================================================================
+extraEnvFrom: |
+  - secretRef:
+      name: airbyte-secrets
+
+env:
   - name: AIRFLOW_CONN_POSTGRES_SOURCE
     value: "postgresql://postgres:postgres@postgres-source.airflow.svc.cluster.local:5432/postgres"
-# DAGS_FOLDER will be auto-set by the chart based on gitSync config
-# Do NOT manually override it - the chart calculates the correct path
-# based on dags.gitSync.subPath
+  - name: AIRFLOW_CONN_AIRBYTE_CLOUD
+    value: "http://https%3A%2F%2Fapi.airbyte.com"

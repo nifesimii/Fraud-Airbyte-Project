@@ -148,7 +148,8 @@ SNOWFLAKE_ENV_VARS = {
 
 SODA_POD_DEFAULTS = dict(
     namespace="airflow",
-    image="sodadata/soda-core:latest",
+    image="soda-core-arm:latest",
+    image_pull_policy="IfNotPresent",
     get_logs=True,
     log_events_on_failure=True,
     is_delete_operator_pod=True,

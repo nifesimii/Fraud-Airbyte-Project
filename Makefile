@@ -1,5 +1,379 @@
-.PHONY: help status-all airflow-up airflow-ui components-up
+# .PHONY: help status-all airflow-up airflow-ui components-up
 
+# GREEN := \033[0;32m
+# YELLOW := \033[1;33m
+# BLUE := \033[0;34m
+# CYAN := \033[0;36m
+# RED := \033[0;31m
+# NC := \033[0m
+
+# .DEFAULT_GOAL := help
+
+# help: ## Show this help
+# 	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+# 	@echo "$(BLUE)║      AIRFLOW + AIRBYTE CLOUD DATA PLATFORM                ║$(NC)"
+# 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+# 	@echo ""
+# 	@echo "$(CYAN)🚀 QUICK START:$(NC)"
+# 	@echo "  $(GREEN)make setup$(NC)           - Complete platform setup"
+# 	@echo "  $(GREEN)make status-all$(NC)      - Check all services"
+# 	@echo "  $(GREEN)make airflow-ui$(NC)      - Open Airflow UI"
+# 	@echo ""
+# 	@echo "$(CYAN)📦 COMPONENTS:$(NC)"
+# 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}'
+# 	@echo ""
+# 	@echo "$(CYAN)📚 Documentation:$(NC)"
+# 	@echo "  Airbyte Cloud: $(BLUE)docs/AIRBYTE_CLOUD.md$(NC)"
+# 	@echo "  Architecture:  $(BLUE)docs/ARCHITECTURE.md$(NC)"
+
+# # ============================================================================
+# # SETUP & DEPLOYMENT
+# # ============================================================================
+
+# setup: airflow-up components-up setup-connections ## Complete platform setup
+# 	@echo ""
+# 	@echo "$(GREEN)╔════════════════════════════════════════════════════════════╗$(NC)"
+# 	@echo "$(GREEN)║          ✅ PLATFORM SETUP COMPLETE! ✅                     ║$(NC)"
+# 	@echo "$(GREEN)╚════════════════════════════════════════════════════════════╝$(NC)"
+# 	@echo ""
+# 	@echo "$(CYAN)Access Points:$(NC)"
+# 	@echo "  Airflow:     $(GREEN)make airflow-ui$(NC)     → http://localhost:8080"
+# 	@echo "  PgAdmin:     $(GREEN)make pgadmin-ui$(NC)     → http://localhost:8888"
+# 	@echo "  phpMyAdmin:  $(GREEN)make phpmyadmin-ui$(NC)  → http://localhost:8889"
+# 	@echo "  Airbyte:     $(GREEN)https://cloud.airbyte.com$(NC)"
+
+# airflow-up: ## Deploy Airflow on Kubernetes
+# 	@echo "$(YELLOW)━━━ Deploying Airflow ━━━$(NC)"
+# 	@cd deployments/airflow && $(MAKE) all
+
+# components-up: ## Deploy MySQL, PostgreSQL source, PgAdmin & phpMyAdmin
+# 	@echo "$(YELLOW)━━━ Deploying Additional Components ━━━$(NC)"
+# 	@cd deployments/airflow && $(MAKE) install-all-components
+
+# setup-connections: ## Setup Airflow connections (Airbyte, MySQL, PostgreSQL)
+# 	@echo "$(YELLOW)━━━ Setting up connections ━━━$(NC)"
+# 	@cd deployments/airflow && $(MAKE) setup-connections
+
+# # ============================================================================
+# # STATUS & MONITORING
+# # ============================================================================
+
+# status-all: ## Show status of all services
+# 	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+# 	@echo "$(BLUE)║                  PLATFORM STATUS                           ║$(NC)"
+# 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+# 	@echo ""
+# 	@echo "$(CYAN)📊 Kubernetes Pods:$(NC)"
+# 	@kubectl get pods -n airflow 2>/dev/null || echo "  $(YELLOW)Airflow namespace not found$(NC)"
+# 	@echo ""
+# 	@echo "$(CYAN)🔗 Services:$(NC)"
+# 	@kubectl get svc -n airflow 2>/dev/null || echo "  $(YELLOW)No services found$(NC)"
+# 	@echo ""
+# 	@echo "$(GREEN)☁️  Airbyte Cloud:$(NC)"
+# 	@echo "  Dashboard: $(CYAN)https://cloud.airbyte.com$(NC)"
+# 	@echo "  Status: $(GREEN)External Service$(NC)"
+
+# health-check: ## Run health checks
+# 	@echo "$(YELLOW)Running health checks...$(NC)"
+# 	@echo ""
+# 	@echo -n "Airflow Scheduler: "
+# 	@kubectl get pods -n airflow -l component=scheduler -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+# 	@echo -n "Airflow Webserver: "
+# 	@kubectl get pods -n airflow -l component=webserver -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+# 	@echo -n "Airflow PostgreSQL: "
+# 	@kubectl get pods -n airflow -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+# 	@echo -n "Source MySQL: "
+# 	@kubectl get pods -n airflow -l app=mysql -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+# 	@echo -n "Source PostgreSQL: "
+# 	@kubectl get pods -n airflow -l app=postgres-source -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+# 	@echo -n "PgAdmin: "
+# 	@kubectl get pods -n airflow -l app=pgadmin -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+# 	@echo -n "phpMyAdmin: "
+# 	@kubectl get pods -n airflow -l app=phpmyadmin -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+
+# # ============================================================================
+# # UI ACCESS
+# # ============================================================================
+
+# airflow-ui: ## Open Airflow UI
+# 	@echo "$(GREEN)🚀 Opening Airflow UI$(NC)"
+# 	@echo "  URL: $(CYAN)http://localhost:8080$(NC)"
+# 	@echo "  Login: $(GREEN)admin / admin$(NC)"
+# 	@echo ""
+# 	@cd deployments/airflow && $(MAKE) port-forward
+
+# pgadmin-ui: ## Open PgAdmin UI (PostgreSQL source)
+# 	@echo "$(GREEN)🗄️  Opening PgAdmin UI$(NC)"
+# 	@echo "  URL: $(CYAN)http://localhost:8888$(NC)"
+# 	@echo "  Login: $(GREEN)admin@admin.com / admin$(NC)"
+# 	@echo "  Manages: $(YELLOW)PostgreSQL Source (fraud_analytics)$(NC)"
+# 	@echo ""
+# 	@cd deployments/airflow && $(MAKE) port-forward-pgadmin
+
+# phpmyadmin-ui: ## Open phpMyAdmin UI (MySQL source)
+# 	@echo "$(GREEN)🗄️  Opening phpMyAdmin UI$(NC)"
+# 	@echo "  URL: $(CYAN)http://localhost:8889$(NC)"
+# 	@echo "  Server: $(GREEN)mysql$(NC)"
+# 	@echo "  Username: $(GREEN)airflow$(NC) or $(GREEN)root$(NC)"
+# 	@echo "  Password: $(GREEN)airflow123$(NC) or $(GREEN)rootpassword$(NC)"
+# 	@echo ""
+# 	@cd deployments/airflow && $(MAKE) port-forward-phpmyadmin
+
+# mysql-connect: ## Connect to MySQL (port-forward)
+# 	@echo "$(GREEN)🔌 Connecting to MySQL$(NC)"
+# 	@cd deployments/airflow && $(MAKE) port-forward-mysql
+
+# postgres-connect: ## Connect to PostgreSQL source (port-forward)
+# 	@echo "$(GREEN)🔌 Connecting to PostgreSQL Source$(NC)"
+# 	@cd deployments/airflow && $(MAKE) port-forward-postgres-source
+
+# # ============================================================================
+# # LOGS & DEBUG
+# # ============================================================================
+
+# logs-scheduler: ## Airflow scheduler logs
+# 	@cd deployments/airflow && $(MAKE) logs-scheduler
+
+# logs-webserver: ## Airflow webserver logs
+# 	@cd deployments/airflow && $(MAKE) logs-webserver
+
+# logs-mysql: ## MySQL logs
+# 	@kubectl logs -n airflow -l app=mysql --tail=100 -f
+
+# logs-postgres-source: ## PostgreSQL source logs
+# 	@kubectl logs -n airflow -l app=postgres-source --tail=100 -f
+
+# logs-pgadmin: ## PgAdmin logs
+# 	@kubectl logs -n airflow -l app=pgadmin --tail=100 -f
+
+# logs-phpmyadmin: ## phpMyAdmin logs
+# 	@kubectl logs -n airflow -l app=phpmyadmin --tail=100 -f
+
+# debug: ## Show debug information
+# 	@cd deployments/airflow && $(MAKE) debug
+
+# # ============================================================================
+# # DAG OPERATIONS
+# # ============================================================================
+
+# list-dags: ## List all Airflow DAGs
+# 	@cd deployments/airflow && $(MAKE) list-dags
+
+# trigger: ## Trigger DAG (usage: make trigger DAG=my_dag)
+# 	@if [ -z "$(DAG)" ]; then \
+# 		echo "$(RED)Usage: make trigger DAG=<dag_id>$(NC)"; \
+# 		$(MAKE) list-dags; \
+# 		exit 1; \
+# 	fi
+# 	@cd deployments/airflow && $(MAKE) trigger DAG=$(DAG)
+
+# pause: ## Pause DAG (usage: make pause DAG=my_dag)
+# 	@cd deployments/airflow && $(MAKE) pause DAG=$(DAG)
+
+# unpause: ## Unpause DAG (usage: make unpause DAG=my_dag)
+# 	@cd deployments/airflow && $(MAKE) unpause DAG=$(DAG)
+
+
+# # ============================================================================
+# # FRAUD DETECTION PIPELINE
+# # ============================================================================
+
+# setup-fraud-pipeline: ## Setup fraud detection pipeline
+# 	@echo "$(YELLOW)━━━ Setting up Fraud Detection Pipeline ━━━$(NC)"
+# 	@cd deployments/airflow && $(MAKE) setup-fraud-pipeline
+
+# fraud-pipeline-status: ## Show fraud pipeline status
+# 	@cd deployments/airflow && $(MAKE) fraud-pipeline-status
+
+# trigger-fraud: ## Trigger fraud detection pipeline
+# 	@echo "$(YELLOW)🚨 Triggering Fraud Detection Pipeline...$(NC)"
+# 	@cd deployments/airflow && $(MAKE) trigger-fraud-pipeline
+
+# unpause-fraud: ## Enable fraud detection pipeline
+# 	@cd deployments/airflow && $(MAKE) unpause-fraud-pipeline
+
+# pause-fraud: ## Disable fraud detection pipeline
+# 	@cd deployments/airflow && $(MAKE) pause-fraud-pipeline
+
+# check-fraud-dag: ## Check if fraud DAG is loaded
+# 	@cd deployments/airflow && $(MAKE) check-fraud-dag
+
+# verify-fraud-data: ## Verify fraud data in databases
+# 	@cd deployments/airflow && $(MAKE) verify-fraud-data
+
+# reset-fraud-data: ## Reset fraud detection data (WARNING)
+# 	@cd deployments/airflow && $(MAKE) reset-fraud-data
+
+# fraud-help: ## Show fraud pipeline quick start
+# 	@cd deployments/airflow && $(MAKE) fraud-pipeline-help
+
+
+
+# # ============================================================================
+# # CONNECTIONS
+# # ============================================================================
+
+# list-connections: ## List Airflow connections
+# 	@cd deployments/airflow && $(MAKE) list-connections
+
+# add-connection: ## Add custom connection
+# 	@echo "$(CYAN)Available connection types: http, mysql, postgres, s3, snowflake$(NC)"
+# 	@echo "$(YELLOW)Usage: make add-connection CONN_ID=my_conn CONN_TYPE=mysql CONN_HOST=localhost$(NC)"
+# 	@cd deployments/airflow && $(MAKE) add-conn CONN_ID=$(CONN_ID) CONN_TYPE=$(CONN_TYPE) CONN_HOST=$(CONN_HOST)
+
+# # ============================================================================
+# # TESTING
+# # ============================================================================
+
+# test-mysql: ## Test MySQL connection
+# 	@cd deployments/airflow && $(MAKE) test-mysql
+
+# test-postgres-source: ## Test PostgreSQL source connection
+# 	@cd deployments/airflow && $(MAKE) test-postgres-source
+
+# test-all: test-mysql test-postgres-source health-check ## Run all tests
+# 	@echo "$(GREEN)✓ All tests passed$(NC)"
+
+# # ============================================================================
+# # MAINTENANCE
+# # ============================================================================
+
+# restart-airflow: ## Restart Airflow services
+# 	@echo "$(YELLOW)Restarting Airflow...$(NC)"
+# 	@cd deployments/airflow && $(MAKE) restart
+
+# restart-components: ## Restart MySQL, PostgreSQL, PgAdmin, phpMyAdmin
+# 	@echo "$(YELLOW)Restarting components...$(NC)"
+# 	@kubectl delete pod -n airflow -l app=mysql 2>/dev/null || true
+# 	@kubectl delete pod -n airflow -l app=postgres-source 2>/dev/null || true
+# 	@kubectl delete pod -n airflow -l app=pgadmin 2>/dev/null || true
+# 	@kubectl delete pod -n airflow -l app=phpmyadmin 2>/dev/null || true
+# 	@echo "$(GREEN)✓ Components restarting$(NC)"
+
+# upgrade-airflow: ## Upgrade Airflow with new code
+# 	@cd deployments/airflow && $(MAKE) upgrade
+
+# clean-failed-pods: ## Clean up failed pods
+# 	@cd deployments/airflow && $(MAKE) cleanup-pods
+
+# # ============================================================================
+# # TEARDOWN
+# # ============================================================================
+
+# uninstall-components: ## Uninstall all data sources and UIs
+# 	@echo "$(RED)Uninstalling components...$(NC)"
+# 	@cd deployments/airflow && $(MAKE) uninstall-components
+
+# uninstall-airflow: ## Uninstall Airflow only
+# 	@echo "$(RED)Uninstalling Airflow...$(NC)"
+# 	@cd deployments/airflow && $(MAKE) uninstall
+
+# uninstall-all: ## Uninstall everything (WARNING: destructive)
+# 	@echo "$(RED)╔════════════════════════════════════════════════════════════╗$(NC)"
+# 	@echo "$(RED)║              ⚠️  WARNING: DESTRUCTIVE ACTION ⚠️              ║$(NC)"
+# 	@echo "$(RED)╚════════════════════════════════════════════════════════════╝$(NC)"
+# 	@echo ""
+# 	@echo "$(YELLOW)This will delete:$(NC)"
+# 	@echo "  - Airflow namespace and all pods"
+# 	@echo "  - All databases (PostgreSQL, MySQL)"
+# 	@echo "  - All configurations and secrets"
+# 	@echo ""
+# 	@read -p "Type 'DELETE' to confirm: " confirm; \
+# 	if [ "$$confirm" = "DELETE" ]; then \
+# 		cd deployments/airflow && $(MAKE) uninstall; \
+# 		echo "$(GREEN)✓ Platform uninstalled$(NC)"; \
+# 	else \
+# 		echo "$(YELLOW)Cancelled$(NC)"; \
+# 	fi
+
+# # ============================================================================
+# # SHELL ACCESS
+# # ============================================================================
+
+# shell-scheduler: ## Shell into scheduler pod
+# 	@cd deployments/airflow && $(MAKE) shell-scheduler
+
+# shell-webserver: ## Shell into webserver pod
+# 	@cd deployments/airflow && $(MAKE) shell-webserver
+
+# shell-mysql: ## Shell into MySQL
+# 	@cd deployments/airflow && $(MAKE) shell-mysql
+
+# shell-postgres-source: ## Shell into PostgreSQL source
+# 	@cd deployments/airflow && $(MAKE) shell-postgres-source
+
+# shell-postgres: ## Shell into Airflow PostgreSQL (metadata)
+# 	@cd deployments/airflow && $(MAKE) shell-postgres
+
+# # ============================================================================
+# # DOCUMENTATION
+# # ============================================================================
+
+# docs: ## Open documentation
+# 	@echo "$(CYAN)📚 Documentation:$(NC)"
+# 	@echo "  Airbyte Cloud: docs/AIRBYTE_CLOUD.md"
+# 	@echo "  Architecture:  docs/ARCHITECTURE.md"
+# 	@echo "  Deployment:    docs/DEPLOYMENT.md"
+# 	@cat docs/AIRBYTE_CLOUD.md 2>/dev/null || echo "$(YELLOW)Documentation not found$(NC)"
+
+# show-urls: ## Show all service URLs
+# 	@echo "$(CYAN)🌐 Service URLs:$(NC)"
+# 	@echo ""
+# 	@echo "$(GREEN)Local Services:$(NC)"
+# 	@echo "  Airflow:     http://localhost:8080  (admin/admin)"
+# 	@echo "  PgAdmin:     http://localhost:8888  (admin@admin.com/admin)"
+# 	@echo "  phpMyAdmin:  http://localhost:8889  (airflow/airflow123)"
+# 	@echo "  MySQL:       localhost:3307         (direct connection)"
+# 	@echo "  PostgreSQL:  localhost:5433         (direct connection)"
+# 	@echo ""
+# 	@echo "$(GREEN)Cloud Services:$(NC)"
+# 	@echo "  Airbyte:   https://cloud.airbyte.com"
+# 	@echo ""
+# 	@echo "$(YELLOW)To access local services, run:$(NC)"
+# 	@echo "  Airflow:     make airflow-ui"
+# 	@echo "  PgAdmin:     make pgadmin-ui"
+# 	@echo "  phpMyAdmin:  make phpmyadmin-ui"
+# 	@echo "  MySQL:       make mysql-connect"
+# 	@echo "  PostgreSQL:  make postgres-connect"
+
+# # ============================================================================
+# # DEVELOPMENT
+# # ============================================================================
+
+# dev-setup: setup ## Alias for setup (for development)
+
+# dev-reset: uninstall-all setup ## Complete reset and redeploy
+
+# quick-restart: restart-airflow ## Quick restart without rebuild
+
+
+
+
+
+.PHONY: help all clean build install wait-postgres migrate create-session patch-deployments wait-components status port-forward fix-log-permissions
+
+# Configuration
+AIRFLOW_VERSION := 3.0.2
+HELM_CHART_VERSION := 1.18.0
+IMAGE_NAME := my-dags
+IMAGE_TAG := $(shell date +%Y%m%d%H%M%S)
+POSTGRES_IMAGE := bitnamilegacy/postgresql:14.10.0
+NAMESPACE := airflow
+POSTGRES_PASSWORD := postgres
+POSTGRES_SOURCE_PASSWORD := postgres
+MYSQL_PASSWORD := airflow123
+PGADMIN_PASSWORD := admin
+VALUES_FILE := values-override.yaml
+
+
+# ✅ Load Snowflake credentials from .env file
+-include .env
+export
+
+
+
+
+# Colors
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
 BLUE := \033[0;34m
@@ -9,339 +383,862 @@ NC := \033[0m
 
 .DEFAULT_GOAL := help
 
-help: ## Show this help
+help: ## Show this help message
 	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║      AIRFLOW + AIRBYTE CLOUD DATA PLATFORM                ║$(NC)"
+	@echo "$(BLUE)║         AIRFLOW $(AIRFLOW_VERSION) ON K3S (RANCHER)            ║$(NC)"
 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@echo "$(CYAN)🚀 QUICK START:$(NC)"
-	@echo "  $(GREEN)make setup$(NC)           - Complete platform setup"
-	@echo "  $(GREEN)make status-all$(NC)      - Check all services"
-	@echo "  $(GREEN)make airflow-ui$(NC)      - Open Airflow UI"
-	@echo ""
-	@echo "$(CYAN)📦 COMPONENTS:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(CYAN)📚 Documentation:$(NC)"
-	@echo "  Airbyte Cloud: $(BLUE)docs/AIRBYTE_CLOUD.md$(NC)"
-	@echo "  Architecture:  $(BLUE)docs/ARCHITECTURE.md$(NC)"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-30s$(NC) %s\n", $$1, $$2}'
 
-# ============================================================================
-# SETUP & DEPLOYMENT
-# ============================================================================
+all: clean build create-k8s-resources install wait-postgres migrate create-session patch-deployments wait-components install-all-components setup-connections status ## Complete installation
 
-setup: airflow-up components-up setup-connections ## Complete platform setup
+clean: ## Clean up existing installation
+	@echo "$(YELLOW)━━━ STEP 1: Cleanup ━━━$(NC)"
+	@helm uninstall airflow -n $(NAMESPACE) 2>/dev/null || true
+	@kubectl delete namespace $(NAMESPACE) --force --grace-period=0 2>/dev/null || true
+	@rdctl shell sudo rm -rf /tmp/airflow-logs 2>/dev/null || true
+	@sleep 5
+	@echo "$(GREEN)✓ Clean environment$(NC)"
+
+build: ## Build Airflow Docker image
+	@echo "$(YELLOW)━━━ STEP 2: Build Airflow Image ━━━$(NC)"
+	@docker build -t $(IMAGE_NAME):$(IMAGE_TAG) -f ../cicd/Dockerfile .
+	@echo $(IMAGE_TAG) > .airflow-image-tag
+	@echo "$(GREEN)✓ Built: $(IMAGE_NAME):$(IMAGE_TAG)$(NC)"
+
+pull-postgres: ## Pull PostgreSQL image
+	@echo "$(YELLOW)━━━ STEP 3: Pull PostgreSQL Image ━━━$(NC)"
+	@docker pull $(POSTGRES_IMAGE)
+	@echo "$(GREEN)✓ PostgreSQL image ready$(NC)"
+
+update-values: ## Update ONLY Airflow image tag in values file
+	@echo "$(YELLOW)━━━ Updating Airflow Image Tag ━━━$(NC)"
+	@sed -i.bak '/images:/,/airflow:/{s/tag: "[^"]*"/tag: "$(IMAGE_TAG)"/;}' $(VALUES_FILE)
+	@echo "$(GREEN)✓ Updated Airflow image to: $(IMAGE_TAG)$(NC)"
+	@echo "$(CYAN)  PostgreSQL tag unchanged: 14.10.0$(NC)"
+
+setup-helm: ## Setup Helm repositories
+	@echo "$(YELLOW)━━━ STEP 4: Setup Helm ━━━$(NC)"
+	@helm repo add apache-airflow https://airflow.apache.org 2>/dev/null || true
+	@helm repo update > /dev/null 2>&1
+	@echo "$(GREEN)✓ Helm ready$(NC)"
+
+create-namespace: ## Create namespace
+	@echo "$(YELLOW)━━━ STEP 5: Create Namespace ━━━$(NC)"
+	@kubectl create namespace $(NAMESPACE) 2>/dev/null || true
+	@echo "$(GREEN)✓ Namespace: $(NAMESPACE)$(NC)"
+
+create-k8s-resources: create-namespace fix-log-permissions ## Create K8s resources
+	@echo "$(YELLOW)━━━ STEP 6: Create K8s Resources ━━━$(NC)"
+	@kubectl apply -f ../k8s/secrets/git-secrets.yaml 2>/dev/null || true
+	@kubectl apply -f ../k8s/secrets/airbyte-secrets.yaml
+	@kubectl apply -f ../k8s/airflow-logs.yaml
+	@echo "$(GREEN)✓ Secrets and storage created$(NC)"
+
+fix-log-permissions: ## Fix hostPath log volume permissions (Rancher Desktop)
+	@echo "$(YELLOW)━━━ Fixing Log Volume Permissions ━━━$(NC)"
+	@rdctl shell sudo mkdir -p /tmp/airflow-logs
+	@rdctl shell sudo chown -R 50000:0 /tmp/airflow-logs
+	@rdctl shell sudo chmod -R 775 /tmp/airflow-logs
+	@echo "$(GREEN)✓ Log volume permissions fixed$(NC)"
+
+install: pull-postgres update-values setup-helm create-k8s-resources ## Install Airflow
+	@echo "$(YELLOW)━━━ STEP 7: Install Airflow $(AIRFLOW_VERSION) ━━━$(NC)"
+	@helm install airflow apache-airflow/airflow \
+		--version $(HELM_CHART_VERSION) \
+		--namespace $(NAMESPACE) \
+		-f $(VALUES_FILE) \
+		--set images.airflow.pullPolicy=IfNotPresent \
+		--set postgresql.image.pullPolicy=IfNotPresent \
+		--set migrateDatabaseJob.enabled=false \
+		--set createUserJob.useHelmHooks=false \
+		--set scheduler.waitForMigrations.enabled=false \
+		--set webserver.waitForMigrations.enabled=false \
+		--set apiServer.waitForMigrations.enabled=false \
+		--set triggerer.waitForMigrations.enabled=false \
+		--set dagProcessor.waitForMigrations.enabled=false \
+		--timeout 5m || echo "$(YELLOW)⚠ Helm timeout (expected)$(NC)"
+	@echo "$(GREEN)✓ Helm chart installed$(NC)"
+
+wait-postgres: ## Wait for PostgreSQL
+	@echo "$(YELLOW)━━━ STEP 8: Wait for PostgreSQL ━━━$(NC)"
+	@kubectl wait --for=condition=ready pod \
+		-l app.kubernetes.io/name=postgresql \
+		-n $(NAMESPACE) \
+		--timeout=300s
+	@echo "$(GREEN)✓ PostgreSQL ready$(NC)"
+
+migrate: wait-postgres ## Run database migration
+	@echo "$(YELLOW)━━━ STEP 9: Database Migration ━━━$(NC)"
+	@kubectl delete pod -n $(NAMESPACE) airflow-migration 2>/dev/null || true
+	@kubectl run airflow-migration \
+		--namespace=$(NAMESPACE) \
+		--image=$(IMAGE_NAME):$(shell cat .airflow-image-tag 2>/dev/null || echo "latest") \
+		--image-pull-policy=IfNotPresent \
+		--restart=Never \
+		--env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@airflow-postgresql:5432/postgres" \
+		--command -- sh -c "echo y | airflow db reset"
+	@echo "  Waiting for migration..."
+	@sleep 30
+	@if kubectl logs -n $(NAMESPACE) airflow-migration 2>/dev/null | grep -q "Airflow database tables created"; then \
+		echo "$(GREEN)✓ Database migration successful$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ Check logs:$(NC)"; \
+		kubectl logs -n $(NAMESPACE) airflow-migration 2>&1 | tail -10; \
+	fi
+
+create-session: ## Create session table
+	@echo "$(YELLOW)━━━ STEP 10: Create Session Table ━━━$(NC)"
+	@sleep 5
+	@kubectl exec -n $(NAMESPACE) airflow-postgresql-0 -- \
+		env PGPASSWORD=$(POSTGRES_PASSWORD) psql -U postgres -d postgres -c " \
+		CREATE TABLE IF NOT EXISTS session ( \
+			id SERIAL PRIMARY KEY, \
+			session_id VARCHAR(255) UNIQUE NOT NULL, \
+			data BYTEA, \
+			expiry TIMESTAMP \
+		);" 2>&1 | grep -v "already exists" || true
+	@echo "$(GREEN)✓ Session table ready$(NC)"
+
+patch-deployments: ## Patch deployments
+	@echo "$(YELLOW)━━━ STEP 11: Patch Deployments ━━━$(NC)"
+	@sleep 20
+	@kubectl patch deployment airflow-webserver -n $(NAMESPACE) --type=json \
+		-p='[{"op": "remove", "path": "/spec/template/spec/initContainers/0"}]' 2>/dev/null || echo "  Webserver: no init container"
+	@kubectl patch deployment airflow-api-server -n $(NAMESPACE) --type=json \
+		-p='[{"op": "remove", "path": "/spec/template/spec/initContainers/0"}]' 2>/dev/null || echo "  API Server: no init container"
+	@echo "$(GREEN)✓ Deployments patched$(NC)"
+
+create-admin: ## Create admin user
+	@echo "$(YELLOW)━━━ STEP 12: Create Admin User ━━━$(NC)"
+	@sleep 10
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow users create --username admin --firstname Admin --lastname User \
+		--role Admin --email admin@example.com --password admin 2>/dev/null || echo "  User already exists"
+	@echo "$(GREEN)✓ Admin user ready$(NC)"
+
+wait-components: ## Wait for components
+	@echo "$(YELLOW)━━━ STEP 13: Wait for Components ━━━$(NC)"
+	@sleep 30
+	@for comp in scheduler triggerer dag-processor; do \
+		echo -n "  $$comp..."; \
+		if kubectl wait --for=condition=ready pod -l component=$$comp -n $(NAMESPACE) --timeout=180s 2>/dev/null; then \
+			echo " $(GREEN)✓$(NC)"; \
+		else \
+			echo " $(YELLOW)⚠$(NC)"; \
+		fi \
+	done
+	@$(MAKE) create-admin
+
+cleanup-pods: ## Cleanup failed pods
+	@kubectl delete pod -n $(NAMESPACE) --field-selector=status.phase=Failed 2>/dev/null || true
+	@kubectl delete pod -n $(NAMESPACE) --field-selector=status.phase=Error 2>/dev/null || true
+	@kubectl delete pod -n $(NAMESPACE) airflow-migration 2>/dev/null || true
+
+status: cleanup-pods ## Show status
 	@echo ""
 	@echo "$(GREEN)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(GREEN)║          ✅ PLATFORM SETUP COMPLETE! ✅                     ║$(NC)"
+	@echo "$(GREEN)║       ✅ AIRFLOW $(AIRFLOW_VERSION) ON K3S DEPLOYED! ✅          ║$(NC)"
 	@echo "$(GREEN)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@echo "$(CYAN)Access Points:$(NC)"
-	@echo "  Airflow:     $(GREEN)make airflow-ui$(NC)     → http://localhost:8080"
-	@echo "  PgAdmin:     $(GREEN)make pgadmin-ui$(NC)     → http://localhost:8888"
-	@echo "  phpMyAdmin:  $(GREEN)make phpmyadmin-ui$(NC)  → http://localhost:8889"
-	@echo "  Airbyte:     $(GREEN)https://cloud.airbyte.com$(NC)"
-
-airflow-up: ## Deploy Airflow on Kubernetes
-	@echo "$(YELLOW)━━━ Deploying Airflow ━━━$(NC)"
-	@cd deployments/airflow && $(MAKE) all
-
-components-up: ## Deploy MySQL, PostgreSQL source, PgAdmin & phpMyAdmin
-	@echo "$(YELLOW)━━━ Deploying Additional Components ━━━$(NC)"
-	@cd deployments/airflow && $(MAKE) install-all-components
-
-setup-connections: ## Setup Airflow connections (Airbyte, MySQL, PostgreSQL)
-	@echo "$(YELLOW)━━━ Setting up connections ━━━$(NC)"
-	@cd deployments/airflow && $(MAKE) setup-connections
+	@echo "$(BLUE)📊 POD STATUS:$(NC)"
+	@kubectl get pods -n $(NAMESPACE)
+	@echo ""
+	@echo "$(CYAN)Access: $(GREEN)make port-forward$(NC)"
+	@echo "$(CYAN)URL: $(GREEN)http://localhost:8080$(NC)"
+	@echo "$(CYAN)Login: $(GREEN)admin / admin$(NC)"
 
 # ============================================================================
-# STATUS & MONITORING
+# ADDITIONAL COMPONENTS (MySQL, PostgreSQL Source, PgAdmin, phpMyAdmin)
 # ============================================================================
 
-status-all: ## Show status of all services
-	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║                  PLATFORM STATUS                           ║$(NC)"
-	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
-	@echo ""
-	@echo "$(CYAN)📊 Kubernetes Pods:$(NC)"
-	@kubectl get pods -n airflow 2>/dev/null || echo "  $(YELLOW)Airflow namespace not found$(NC)"
-	@echo ""
-	@echo "$(CYAN)🔗 Services:$(NC)"
-	@kubectl get svc -n airflow 2>/dev/null || echo "  $(YELLOW)No services found$(NC)"
-	@echo ""
-	@echo "$(GREEN)☁️  Airbyte Cloud:$(NC)"
-	@echo "  Dashboard: $(CYAN)https://cloud.airbyte.com$(NC)"
-	@echo "  Status: $(GREEN)External Service$(NC)"
+install-mysql: ## Install MySQL source database
+	@echo "$(YELLOW)━━━ Installing MySQL ━━━$(NC)"
+	@kubectl apply -f ../k8s/mysql-deployment.yaml
+	@echo "  Waiting for MySQL to be ready..."
+	@sleep 10
+	@kubectl wait --for=condition=ready pod -l app=mysql -n $(NAMESPACE) --timeout=300s || \
+		(echo "$(RED)MySQL failed to start. Checking logs:$(NC)" && \
+		 kubectl logs -n $(NAMESPACE) -l app=mysql --tail=50 && \
+		 exit 1)
+	@echo "$(GREEN)✓ MySQL installed$(NC)"
 
-health-check: ## Run health checks
-	@echo "$(YELLOW)Running health checks...$(NC)"
-	@echo ""
-	@echo -n "Airflow Scheduler: "
-	@kubectl get pods -n airflow -l component=scheduler -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
-	@echo -n "Airflow Webserver: "
-	@kubectl get pods -n airflow -l component=webserver -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
-	@echo -n "Airflow PostgreSQL: "
-	@kubectl get pods -n airflow -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
-	@echo -n "Source MySQL: "
-	@kubectl get pods -n airflow -l app=mysql -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
-	@echo -n "Source PostgreSQL: "
-	@kubectl get pods -n airflow -l app=postgres-source -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
-	@echo -n "PgAdmin: "
-	@kubectl get pods -n airflow -l app=pgadmin -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
-	@echo -n "phpMyAdmin: "
-	@kubectl get pods -n airflow -l app=phpmyadmin -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running && echo "$(GREEN)✓$(NC)" || echo "$(RED)✗$(NC)"
+install-postgres-source: ## Install PostgreSQL source database
+	@echo "$(YELLOW)━━━ Installing Source PostgreSQL ━━━$(NC)"
+	@kubectl apply -f ../k8s/postgres-source-deployment.yaml
+	@echo "  Waiting for PostgreSQL to be ready..."
+	@sleep 10
+	@kubectl wait --for=condition=ready pod -l app=postgres-source -n $(NAMESPACE) --timeout=300s || \
+		(echo "$(RED)PostgreSQL failed to start. Checking logs:$(NC)" && \
+		 kubectl logs -n $(NAMESPACE) -l app=postgres-source --tail=50 && \
+		 exit 1)
+	@echo "$(GREEN)✓ Source PostgreSQL installed$(NC)"
 
-# ============================================================================
-# UI ACCESS
-# ============================================================================
+install-pgadmin: ## Install PgAdmin (for PostgreSQL source)
+	@echo "$(YELLOW)━━━ Installing PgAdmin ━━━$(NC)"
+	@kubectl apply -f ../k8s/pgadmin-deployment.yaml
+	@kubectl wait --for=condition=ready pod -l app=pgadmin -n $(NAMESPACE) --timeout=300s
+	@echo "$(GREEN)✓ PgAdmin installed$(NC)"
 
-airflow-ui: ## Open Airflow UI
-	@echo "$(GREEN)🚀 Opening Airflow UI$(NC)"
-	@echo "  URL: $(CYAN)http://localhost:8080$(NC)"
-	@echo "  Login: $(GREEN)admin / admin$(NC)"
-	@echo ""
-	@cd deployments/airflow && $(MAKE) port-forward
+install-phpmyadmin: ## Install phpMyAdmin (for MySQL)
+	@echo "$(YELLOW)━━━ Installing phpMyAdmin ━━━$(NC)"
+	@kubectl apply -f ../k8s/phpmyadmin-deployment.yaml
+	@kubectl wait --for=condition=ready pod -l app=phpmyadmin -n $(NAMESPACE) --timeout=300s
+	@echo "$(GREEN)✓ phpMyAdmin installed$(NC)"
 
-pgadmin-ui: ## Open PgAdmin UI (PostgreSQL source)
-	@echo "$(GREEN)🗄️  Opening PgAdmin UI$(NC)"
-	@echo "  URL: $(CYAN)http://localhost:8888$(NC)"
-	@echo "  Login: $(GREEN)admin@admin.com / admin$(NC)"
-	@echo "  Manages: $(YELLOW)PostgreSQL Source (fraud_analytics)$(NC)"
-	@echo ""
-	@cd deployments/airflow && $(MAKE) port-forward-pgadmin
-
-phpmyadmin-ui: ## Open phpMyAdmin UI (MySQL source)
-	@echo "$(GREEN)🗄️  Opening phpMyAdmin UI$(NC)"
-	@echo "  URL: $(CYAN)http://localhost:8889$(NC)"
-	@echo "  Server: $(GREEN)mysql$(NC)"
-	@echo "  Username: $(GREEN)airflow$(NC) or $(GREEN)root$(NC)"
-	@echo "  Password: $(GREEN)airflow123$(NC) or $(GREEN)rootpassword$(NC)"
-	@echo ""
-	@cd deployments/airflow && $(MAKE) port-forward-phpmyadmin
-
-mysql-connect: ## Connect to MySQL (port-forward)
-	@echo "$(GREEN)🔌 Connecting to MySQL$(NC)"
-	@cd deployments/airflow && $(MAKE) port-forward-mysql
-
-postgres-connect: ## Connect to PostgreSQL source (port-forward)
-	@echo "$(GREEN)🔌 Connecting to PostgreSQL Source$(NC)"
-	@cd deployments/airflow && $(MAKE) port-forward-postgres-source
+install-all-components: install-mysql install-postgres-source install-pgadmin install-phpmyadmin ## Install all additional components
+	@echo "$(GREEN)✓ All components installed$(NC)"
 
 # ============================================================================
-# LOGS & DEBUG
+# PORT FORWARDING
 # ============================================================================
 
-logs-scheduler: ## Airflow scheduler logs
-	@cd deployments/airflow && $(MAKE) logs-scheduler
+port-forward: ## Port-forward to Airflow webserver
+	@echo "$(GREEN)Port-forwarding to Airflow Webserver...$(NC)"
+	@echo "Access: $(YELLOW)http://localhost:8080$(NC)"
+	@echo "Login: $(GREEN)admin / admin$(NC)"
+	@kubectl port-forward -n $(NAMESPACE) svc/airflow-api-server 8080:8080
 
-logs-webserver: ## Airflow webserver logs
-	@cd deployments/airflow && $(MAKE) logs-webserver
+port-forward-pgadmin: ## Port-forward to PgAdmin
+	@echo "$(GREEN)Port-forwarding to PgAdmin...$(NC)"
+	@echo "Access: $(YELLOW)http://localhost:8888$(NC)"
+	@echo "Login: $(GREEN)admin@admin.com / admin$(NC)"
+	@echo "Manages: $(YELLOW)PostgreSQL Source$(NC)"
+	@kubectl port-forward -n $(NAMESPACE) svc/pgadmin 8888:80
+
+port-forward-phpmyadmin: ## Port-forward to phpMyAdmin
+	@echo "$(GREEN)Port-forwarding to phpMyAdmin...$(NC)"
+	@echo "Access: $(YELLOW)http://localhost:8889$(NC)"
+	@echo "Server: $(GREEN)mysql$(NC)"
+	@echo "Username: $(GREEN)airflow$(NC) or $(GREEN)root$(NC)"
+	@echo "Password: $(GREEN)airflow123$(NC) or $(GREEN)rootpassword$(NC)"
+	@kubectl port-forward -n $(NAMESPACE) svc/phpmyadmin 8889:80
+
+port-forward-mysql: ## Port-forward to MySQL
+	@echo "$(GREEN)Port-forwarding to MySQL...$(NC)"
+	@echo "Connect: $(YELLOW)mysql -h 127.0.0.1 -P 3307 -u airflow -p$(NC)"
+	@echo "Password: $(GREEN)airflow123$(NC)"
+	@kubectl port-forward -n $(NAMESPACE) svc/mysql 3307:3306
+
+port-forward-postgres-source: ## Port-forward to PostgreSQL source
+	@echo "$(GREEN)Port-forwarding to Source PostgreSQL...$(NC)"
+	@echo "Connect: $(YELLOW)psql -h 127.0.0.1 -p 5433 -U postgres -d fraud_analytics$(NC)"
+	@echo "Password: $(GREEN)postgres$(NC)"
+	@kubectl port-forward -n $(NAMESPACE) svc/postgres-source 5433:5432
+
+# ============================================================================
+# LOGS
+# ============================================================================
+
+logs-scheduler: ## Scheduler logs
+	@kubectl logs -n $(NAMESPACE) -l component=scheduler -c scheduler --tail=100 -f
+
+logs-webserver: ## Webserver logs
+	@kubectl logs -n $(NAMESPACE) -l component=webserver -c webserver --tail=100 -f
+
+logs-api: ## API server logs
+	@kubectl logs -n $(NAMESPACE) -l component=api-server -c api-server --tail=100 -f
+
+logs-dag-processor: ## DAG processor logs
+	@kubectl logs -n $(NAMESPACE) -l component=dag-processor -c dag-processor --tail=100 -f
+
+logs-triggerer: ## Triggerer logs
+	@kubectl logs -n $(NAMESPACE) -l component=triggerer -c triggerer --tail=100 -f
 
 logs-mysql: ## MySQL logs
-	@kubectl logs -n airflow -l app=mysql --tail=100 -f
+	@kubectl logs -n $(NAMESPACE) -l app=mysql --tail=100 -f
 
 logs-postgres-source: ## PostgreSQL source logs
-	@kubectl logs -n airflow -l app=postgres-source --tail=100 -f
+	@kubectl logs -n $(NAMESPACE) -l app=postgres-source --tail=100 -f
 
 logs-pgadmin: ## PgAdmin logs
-	@kubectl logs -n airflow -l app=pgadmin --tail=100 -f
+	@kubectl logs -n $(NAMESPACE) -l app=pgadmin --tail=100 -f
 
 logs-phpmyadmin: ## phpMyAdmin logs
-	@kubectl logs -n airflow -l app=phpmyadmin --tail=100 -f
-
-debug: ## Show debug information
-	@cd deployments/airflow && $(MAKE) debug
+	@kubectl logs -n $(NAMESPACE) -l app=phpmyadmin --tail=100 -f
 
 # ============================================================================
 # DAG OPERATIONS
 # ============================================================================
 
-list-dags: ## List all Airflow DAGs
-	@cd deployments/airflow && $(MAKE) list-dags
+list-dags: ## List all DAGs
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- airflow dags list
 
 trigger: ## Trigger DAG (usage: make trigger DAG=my_dag)
 	@if [ -z "$(DAG)" ]; then \
 		echo "$(RED)Usage: make trigger DAG=<dag_id>$(NC)"; \
-		$(MAKE) list-dags; \
 		exit 1; \
 	fi
-	@cd deployments/airflow && $(MAKE) trigger DAG=$(DAG)
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags trigger $(DAG)
+	@echo "$(GREEN)✓ Triggered: $(DAG)$(NC)"
 
 pause: ## Pause DAG (usage: make pause DAG=my_dag)
-	@cd deployments/airflow && $(MAKE) pause DAG=$(DAG)
+	@if [ -z "$(DAG)" ]; then \
+		echo "$(RED)Usage: make pause DAG=<dag_id>$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags pause $(DAG)
 
 unpause: ## Unpause DAG (usage: make unpause DAG=my_dag)
-	@cd deployments/airflow && $(MAKE) unpause DAG=$(DAG)
+	@if [ -z "$(DAG)" ]; then \
+		echo "$(RED)Usage: make unpause DAG=<dag_id>$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags unpause $(DAG)
+
+# ============================================================================
+# CONNECTIONS
+# ============================================================================
+
+add-airbyte-conn: ## Add Airbyte Cloud connection (HTTP API)
+	@echo "$(YELLOW)Adding Airbyte Cloud connection...$(NC)"
+	@if [ -z "$(AIRBYTE_ACCESS_TOKEN)" ] || [ -z "$(AIRBYTE_CLIENT_SECRET)" ]; then \
+		echo "$(RED)ERROR: Missing Airbyte credentials!$(NC)"; \
+		echo "$(YELLOW)Required in .env: AIRBYTE_ACCESS_TOKEN, AIRBYTE_CLIENT_SECRET$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add airbyte_cloud \
+		--conn-type http \
+		--conn-host https://api.airbyte.com \
+		--conn-extra '{ \
+			"client_id": "$(AIRBYTE_ACCESS_TOKEN)", \
+			"client_secret": "$(AIRBYTE_CLIENT_SECRET)", \
+			"connection_id": "$(AIRBYTE_CONNECTION_ID)", \
+			"workspace_id": "$(AIRBYTE_WORKSPACE_ID)" \
+		}' \
+		2>/dev/null || echo "  Connection already exists"
+	@echo "$(GREEN)✓ Airbyte Cloud connection added$(NC)"
+
+add-airbyte-vars: ## Set Airbyte Cloud connection ID variables
+	@echo "$(YELLOW)Setting Airbyte variables...$(NC)"
+	@if [ -z "$(AIRBYTE_CONN_POSTGRES_S3)" ] || [ -z "$(AIRBYTE_CONN_MYSQL_S3)" ] || [ -z "$(AIRBYTE_CONN_S3_SNOWFLAKE)" ]; then \
+		echo "$(RED)ERROR: Missing Airbyte connection IDs!$(NC)"; \
+		echo "$(YELLOW)Required in .env: AIRBYTE_CONN_POSTGRES_S3, AIRBYTE_CONN_MYSQL_S3, AIRBYTE_CONN_S3_SNOWFLAKE$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_conn_postgres_s3 "$(AIRBYTE_CONN_POSTGRES_S3)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_conn_mysql_s3 "$(AIRBYTE_CONN_MYSQL_S3)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_conn_s3_snowflake "$(AIRBYTE_CONN_S3_SNOWFLAKE)"
+	@echo "$(GREEN)✓ Airbyte connection ID variables set$(NC)"
+
+
+add-mysql-conn: ## Add MySQL connection
+	@echo "$(YELLOW)Adding MySQL connection...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add mysql_default \
+		--conn-type mysql \
+		--conn-host mysql.$(NAMESPACE).svc.cluster.local \
+		--conn-port 3306 \
+		--conn-login airflow \
+		--conn-password $(MYSQL_PASSWORD) \
+		--conn-schema fraud_data 2>/dev/null || echo "  Connection already exists"
+	@echo "$(GREEN)✓ MySQL connection added$(NC)"
+
+add-postgres-source-conn: ## Add PostgreSQL source connection
+	@echo "$(YELLOW)Adding Source PostgreSQL connection...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add postgres_source \
+		--conn-type postgres \
+		--conn-host postgres-source.$(NAMESPACE).svc.cluster.local \
+		--conn-port 5432 \
+		--conn-login postgres \
+		--conn-password $(POSTGRES_SOURCE_PASSWORD) \
+		--conn-schema fraud_analytics 2>/dev/null || echo "  Connection already exists"
+	@echo "$(GREEN)✓ Source PostgreSQL connection added$(NC)"
+
+add-aws-conn: ## Add AWS connection
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add aws_conn --conn-type aws --conn-extra '{"region_name":"us-east-1"}' 2>/dev/null || true
+	@echo "$(GREEN)✓ AWS connection added$(NC)"
+
+setup-snowflake-connection:
+	@echo "━━━ Setting up Snowflake Connection ━━━"
+	kubectl exec -n airflow deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add 'snowflake_default' \
+		--conn-type 'snowflake' \
+		--conn-login '$(SNOWFLAKE_USER)' \
+		--conn-password '$(SNOWFLAKE_PASSWORD)' \
+		--conn-schema 'STAGING' \
+		--conn-extra '{"account": "$(SNOWFLAKE_ACCOUNT)", "warehouse": "$(SNOWFLAKE_WAREHOUSE)", "database": "FRAUD_DETECTION", "role": "$(SNOWFLAKE_ROLE)"}'
+	@echo "✓ Snowflake connection configured"
+
+add-conn: ## Add connection (usage: make add-conn CONN_ID=my_conn CONN_TYPE=http CONN_HOST=example.com)
+	@if [ -z "$(CONN_ID)" ] || [ -z "$(CONN_TYPE)" ]; then \
+		echo "$(RED)Usage: make add-conn CONN_ID=<id> CONN_TYPE=<type> [CONN_HOST=<host>]$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow connections add $(CONN_ID) --conn-type $(CONN_TYPE) $(if $(CONN_HOST),--conn-host $(CONN_HOST))
+	@echo "$(GREEN)✓ Connection $(CONN_ID) added$(NC)"
+
+list-connections: ## List all connections
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow connections list
+
+setup-connections: add-airbyte-conn add-airbyte-vars add-mysql-conn add-postgres-source-conn setup-snowflake-connection
+# ============================================================================
+# TESTING
+# ============================================================================
+
+test-mysql: ## Test MySQL connection
+	@echo "$(YELLOW)Testing MySQL...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/mysql -- \
+		mysql -u airflow -p$(MYSQL_PASSWORD) -e "SELECT 'MySQL Connection successful!' as Status, COUNT(*) as transaction_count FROM fraud_data.transactions;"
+	@echo "$(GREEN)✓ MySQL is working$(NC)"
+
+test-postgres-source: ## Test PostgreSQL source connection
+	@echo "$(YELLOW)Testing PostgreSQL source...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/postgres-source -- \
+		psql -U postgres -d fraud_analytics -c "SELECT 'PostgreSQL Connection successful!' as Status, COUNT(*) as customer_count FROM customer_profiles;"
+	@echo "$(GREEN)✓ PostgreSQL source is working$(NC)"
+
+# ============================================================================
+# MAINTENANCE
+# ============================================================================
+
+upgrade: ## Upgrade with new image
+	@echo "$(YELLOW)━━━ Quick Upgrade ━━━$(NC)"
+	@$(MAKE) build
+	@$(MAKE) update-values
+	@helm upgrade airflow apache-airflow/airflow \
+		--version $(HELM_CHART_VERSION) \
+		--namespace $(NAMESPACE) \
+		-f $(VALUES_FILE) \
+		--reuse-values \
+		--timeout 5m
+	@kubectl rollout restart deployment -n $(NAMESPACE) -l tier=airflow
+	@echo "$(GREEN)✓ Upgrade complete$(NC)"
+
+uninstall: ## Uninstall Airflow
+	@echo "$(RED)Uninstalling Airflow...$(NC)"
+	@helm uninstall airflow -n $(NAMESPACE) 2>/dev/null || true
+	@kubectl delete namespace $(NAMESPACE) --force --grace-period=0 2>/dev/null || true
+	@echo "$(GREEN)✓ Uninstalled$(NC)"
+
+uninstall-components: ## Uninstall additional components
+	@echo "$(RED)Uninstalling components...$(NC)"
+	@kubectl delete -f ../k8s/mysql-deployment.yaml 2>/dev/null || true
+	@kubectl delete -f ../k8s/postgres-source-deployment.yaml 2>/dev/null || true
+	@kubectl delete -f ../k8s/pgadmin-deployment.yaml 2>/dev/null || true
+	@kubectl delete -f ../k8s/phpmyadmin-deployment.yaml 2>/dev/null || true
+	@echo "$(GREEN)✓ Components uninstalled$(NC)"
+
+reinstall: uninstall all ## Complete reinstall
+
+restart: ## Restart all Airflow pods
+	@echo "$(YELLOW)Restarting Airflow pods...$(NC)"
+	@kubectl delete pod -n $(NAMESPACE) -l tier=airflow
+	@sleep 10
+	@$(MAKE) status
+
+# ============================================================================
+# SHELL ACCESS
+# ============================================================================
+
+shell-scheduler: ## Shell into scheduler
+	@kubectl exec -it -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- /bin/bash
+
+shell-webserver: ## Shell into webserver  
+	@kubectl exec -it -n $(NAMESPACE) deploy/airflow-webserver -c webserver -- /bin/bash
+
+shell-postgres: ## PostgreSQL shell (Airflow metadata)
+	@kubectl exec -it -n $(NAMESPACE) airflow-postgresql-0 -- \
+		env PGPASSWORD=$(POSTGRES_PASSWORD) psql -U postgres -d postgres
+
+shell-postgres-source: ## Shell into PostgreSQL source
+	@kubectl exec -it -n $(NAMESPACE) deploy/postgres-source -- psql -U postgres -d fraud_analytics
+
+shell-mysql: ## MySQL shell
+	@kubectl exec -it -n $(NAMESPACE) deploy/mysql -- mysql -u airflow -p$(MYSQL_PASSWORD) fraud_data
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+
+get-pods: ## Get all pods
+	@kubectl get pods -n $(NAMESPACE)
+
+get-services: ## Get all services
+	@kubectl get svc -n $(NAMESPACE)
+
+describe: ## Describe pod (usage: make describe POD=<name>)
+	@if [ -z "$(POD)" ]; then \
+		echo "$(RED)Usage: make describe POD=<pod-name>$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl describe pod -n $(NAMESPACE) $(POD)
+
+debug: ## Show debug info
+	@echo "$(YELLOW)Debug Information:$(NC)"
+	@echo ""
+	@echo "$(BLUE)Pods:$(NC)"
+	@kubectl get pods -n $(NAMESPACE)
+	@echo ""
+	@echo "$(BLUE)Services:$(NC)"
+	@kubectl get svc -n $(NAMESPACE)
+	@echo ""
+	@echo "$(BLUE)ConfigMaps:$(NC)"
+	@kubectl get configmap -n $(NAMESPACE)
+	@echo ""
+	@echo "$(BLUE)Recent Events:$(NC)"
+	@kubectl get events -n $(NAMESPACE) --sort-by='.lastTimestamp' | tail -20
+
+reset-db: ## Reset database (WARNING: deletes all data)
+	@echo "$(RED)⚠️  Resetting database...$(NC)"
+	@kubectl run airflow-db-reset --restart=Never --rm -i \
+		--namespace=$(NAMESPACE) \
+		--image=$(IMAGE_NAME):$(shell cat .airflow-image-tag 2>/dev/null || echo "latest") \
+		--image-pull-policy=IfNotPresent \
+		--env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@airflow-postgresql:5432/postgres" \
+		--command -- sh -c "echo y | airflow db reset"
+	@kubectl delete pod -n $(NAMESPACE) -l tier=airflow
+	@echo "$(GREEN)Database reset$(NC)"
+
 
 
 # ============================================================================
 # FRAUD DETECTION PIPELINE
 # ============================================================================
 
-setup-fraud-pipeline: ## Setup fraud detection pipeline
+setup-fraud-pipeline: ## Setup fraud detection pipeline (Airflow Variables)
 	@echo "$(YELLOW)━━━ Setting up Fraud Detection Pipeline ━━━$(NC)"
-	@cd deployments/airflow && $(MAKE) setup-fraud-pipeline
-
-fraud-pipeline-status: ## Show fraud pipeline status
-	@cd deployments/airflow && $(MAKE) fraud-pipeline-status
-
-trigger-fraud: ## Trigger fraud detection pipeline
-	@echo "$(YELLOW)🚨 Triggering Fraud Detection Pipeline...$(NC)"
-	@cd deployments/airflow && $(MAKE) trigger-fraud-pipeline
-
-unpause-fraud: ## Enable fraud detection pipeline
-	@cd deployments/airflow && $(MAKE) unpause-fraud-pipeline
-
-pause-fraud: ## Disable fraud detection pipeline
-	@cd deployments/airflow && $(MAKE) pause-fraud-pipeline
-
-check-fraud-dag: ## Check if fraud DAG is loaded
-	@cd deployments/airflow && $(MAKE) check-fraud-dag
-
-verify-fraud-data: ## Verify fraud data in databases
-	@cd deployments/airflow && $(MAKE) verify-fraud-data
-
-reset-fraud-data: ## Reset fraud detection data (WARNING)
-	@cd deployments/airflow && $(MAKE) reset-fraud-data
-
-fraud-help: ## Show fraud pipeline quick start
-	@cd deployments/airflow && $(MAKE) fraud-pipeline-help
-
-
-
-# ============================================================================
-# CONNECTIONS
-# ============================================================================
-
-list-connections: ## List Airflow connections
-	@cd deployments/airflow && $(MAKE) list-connections
-
-add-connection: ## Add custom connection
-	@echo "$(CYAN)Available connection types: http, mysql, postgres, s3, snowflake$(NC)"
-	@echo "$(YELLOW)Usage: make add-connection CONN_ID=my_conn CONN_TYPE=mysql CONN_HOST=localhost$(NC)"
-	@cd deployments/airflow && $(MAKE) add-conn CONN_ID=$(CONN_ID) CONN_TYPE=$(CONN_TYPE) CONN_HOST=$(CONN_HOST)
-
-# ============================================================================
-# TESTING
-# ============================================================================
-
-test-mysql: ## Test MySQL connection
-	@cd deployments/airflow && $(MAKE) test-mysql
-
-test-postgres-source: ## Test PostgreSQL source connection
-	@cd deployments/airflow && $(MAKE) test-postgres-source
-
-test-all: test-mysql test-postgres-source health-check ## Run all tests
-	@echo "$(GREEN)✓ All tests passed$(NC)"
-
-# ============================================================================
-# MAINTENANCE
-# ============================================================================
-
-restart-airflow: ## Restart Airflow services
-	@echo "$(YELLOW)Restarting Airflow...$(NC)"
-	@cd deployments/airflow && $(MAKE) restart
-
-restart-components: ## Restart MySQL, PostgreSQL, PgAdmin, phpMyAdmin
-	@echo "$(YELLOW)Restarting components...$(NC)"
-	@kubectl delete pod -n airflow -l app=mysql 2>/dev/null || true
-	@kubectl delete pod -n airflow -l app=postgres-source 2>/dev/null || true
-	@kubectl delete pod -n airflow -l app=pgadmin 2>/dev/null || true
-	@kubectl delete pod -n airflow -l app=phpmyadmin 2>/dev/null || true
-	@echo "$(GREEN)✓ Components restarting$(NC)"
-
-upgrade-airflow: ## Upgrade Airflow with new code
-	@cd deployments/airflow && $(MAKE) upgrade
-
-clean-failed-pods: ## Clean up failed pods
-	@cd deployments/airflow && $(MAKE) cleanup-pods
-
-# ============================================================================
-# TEARDOWN
-# ============================================================================
-
-uninstall-components: ## Uninstall all data sources and UIs
-	@echo "$(RED)Uninstalling components...$(NC)"
-	@cd deployments/airflow && $(MAKE) uninstall-components
-
-uninstall-airflow: ## Uninstall Airflow only
-	@echo "$(RED)Uninstalling Airflow...$(NC)"
-	@cd deployments/airflow && $(MAKE) uninstall
-
-uninstall-all: ## Uninstall everything (WARNING: destructive)
-	@echo "$(RED)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(RED)║              ⚠️  WARNING: DESTRUCTIVE ACTION ⚠️              ║$(NC)"
-	@echo "$(RED)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo "$(CYAN)ℹ️  You need Airbyte connection IDs first!$(NC)"
+	@echo "$(CYAN)   Get them from: https://cloud.airbyte.com/connections$(NC)"
 	@echo ""
-	@echo "$(YELLOW)This will delete:$(NC)"
-	@echo "  - Airflow namespace and all pods"
-	@echo "  - All databases (PostgreSQL, MySQL)"
-	@echo "  - All configurations and secrets"
+	@read -p "Enter MySQL Connection ID: " mysql_id; \
+	read -p "Enter PostgreSQL Connection ID: " postgres_id; \
+	kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_mysql_connection_id "$$mysql_id"; \
+	kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set airbyte_postgres_connection_id "$$postgres_id"
+	@echo "$(GREEN)✓ Fraud pipeline variables configured$(NC)"
+
+list-fraud-variables: ## List fraud pipeline Airflow Variables
+	@echo "$(YELLOW)Fraud Pipeline Variables:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables list | grep -E "airbyte_mysql_connection_id|airbyte_postgres_connection_id" || \
+		echo "$(RED)No fraud pipeline variables found. Run: make setup-fraud-pipeline$(NC)"
+
+set-fraud-variable: ## Set individual fraud variable (usage: make set-fraud-variable VAR=var_name VALUE=var_value)
+	@if [ -z "$(VAR)" ] || [ -z "$(VALUE)" ]; then \
+		echo "$(RED)Usage: make set-fraud-variable VAR=<variable_name> VALUE=<value>$(NC)"; \
+		echo "$(YELLOW)Example: make set-fraud-variable VAR=airbyte_mysql_connection_id VALUE=abc-123$(NC)"; \
+		exit 1; \
+	fi
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables set $(VAR) "$(VALUE)"
+	@echo "$(GREEN)✓ Variable $(VAR) set$(NC)"
+
+trigger-fraud-pipeline: ## Trigger fraud detection pipeline DAG
+	@echo "$(YELLOW)🚨 Triggering Fraud Detection Pipeline...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags trigger fraud_detection_pipeline
+	@echo "$(GREEN)✓ Fraud pipeline triggered$(NC)"
+	@echo "$(CYAN)Monitor: make logs-scheduler$(NC)"
+
+unpause-fraud-pipeline: ## Unpause fraud detection pipeline
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags unpause fraud_detection_pipeline 2>/dev/null || \
+		echo "$(RED)DAG not found. Deploy it first!$(NC)"
+	@echo "$(GREEN)✓ Fraud pipeline unpaused$(NC)"
+
+pause-fraud-pipeline: ## Pause fraud detection pipeline
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags pause fraud_detection_pipeline
+	@echo "$(YELLOW)⏸  Fraud pipeline paused$(NC)"
+
+check-fraud-dag: ## Check if fraud detection DAG is loaded
+	@echo "$(YELLOW)Checking fraud detection DAG...$(NC)"
+	@if kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list 2>/dev/null | grep -q "fraud_detection_pipeline"; then \
+		echo "$(GREEN)✓ Fraud detection DAG is loaded$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+			airflow dags show fraud_detection_pipeline; \
+	else \
+		echo "$(RED)✗ Fraud detection DAG not found$(NC)"; \
+		echo "$(YELLOW)Deploy it with: git push or make upgrade$(NC)"; \
+	fi
+
+fraud-pipeline-status: ## Show fraud pipeline execution status
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║         FRAUD DETECTION PIPELINE STATUS                   ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)📊 DAG Status:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list | grep fraud_detection_pipeline 2>/dev/null || \
+		echo "$(RED)  DAG not loaded$(NC)"
+	@echo ""
+	@echo "$(CYAN)🔗 Airflow Variables:$(NC)"
+	@$(MAKE) list-fraud-variables
+	@echo ""
+	@echo "$(CYAN)📈 Recent Runs:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list-runs -d fraud_detection_pipeline --limit 5 2>/dev/null || \
+		echo "$(YELLOW)  No runs yet$(NC)"
+
+verify-fraud-data: ## Verify fraud detection data in databases
+	@echo "$(YELLOW)Checking fraud detection data...$(NC)"
+	@echo ""
+	@echo "$(CYAN)PostgreSQL - customer_transactions:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/postgres-source -- \
+		psql -U postgres -d fraud_analytics -c \
+		"SELECT COUNT(*) as total_transactions, MAX(created_at) as last_created FROM customer_transactions;" 2>/dev/null || \
+		echo "$(RED)  Table not found or no data$(NC)"
+	@echo ""
+	@echo "$(CYAN)MySQL - labeled_transactions:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/mysql -- \
+		mysql -u airflow -p$(MYSQL_PASSWORD) fraud_data -e \
+		"SELECT COUNT(*) as total_labels, SUM(is_fraudulent) as fraudulent_count, MAX(labeled_at) as last_labeled FROM labeled_transactions;" 2>/dev/null || \
+		echo "$(RED)  Table not found or no data$(NC)"
+
+reset-fraud-data: ## Reset fraud detection data (WARNING: destructive)
+	@echo "$(RED)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(RED)║       ⚠️  WARNING: DELETING FRAUD DETECTION DATA ⚠️         ║$(NC)"
+	@echo "$(RED)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@read -p "Type 'DELETE' to confirm: " confirm; \
 	if [ "$$confirm" = "DELETE" ]; then \
-		cd deployments/airflow && $(MAKE) uninstall; \
-		echo "$(GREEN)✓ Platform uninstalled$(NC)"; \
+		echo "$(YELLOW)Dropping PostgreSQL tables...$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/postgres-source -- \
+			psql -U postgres -d fraud_analytics -c "DROP TABLE IF EXISTS customer_transactions CASCADE;" 2>/dev/null; \
+		echo "$(YELLOW)Dropping MySQL tables...$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/mysql -- \
+			mysql -u airflow -p$(MYSQL_PASSWORD) fraud_data -e "DROP TABLE IF EXISTS labeled_transactions;" 2>/dev/null; \
+		echo "$(GREEN)✓ Fraud data reset complete$(NC)"; \
 	else \
 		echo "$(YELLOW)Cancelled$(NC)"; \
 	fi
 
-# ============================================================================
-# SHELL ACCESS
-# ============================================================================
-
-shell-scheduler: ## Shell into scheduler pod
-	@cd deployments/airflow && $(MAKE) shell-scheduler
-
-shell-webserver: ## Shell into webserver pod
-	@cd deployments/airflow && $(MAKE) shell-webserver
-
-shell-mysql: ## Shell into MySQL
-	@cd deployments/airflow && $(MAKE) shell-mysql
-
-shell-postgres-source: ## Shell into PostgreSQL source
-	@cd deployments/airflow && $(MAKE) shell-postgres-source
-
-shell-postgres: ## Shell into Airflow PostgreSQL (metadata)
-	@cd deployments/airflow && $(MAKE) shell-postgres
-
-# ============================================================================
-# DOCUMENTATION
-# ============================================================================
-
-docs: ## Open documentation
+fraud-pipeline-help: ## Show fraud pipeline setup guide
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║       FRAUD DETECTION PIPELINE - QUICK START              ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)📋 Setup Steps:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1. Create Airbyte Cloud Sources & Connections$(NC)"
+	@echo "   - Go to: https://cloud.airbyte.com"
+	@echo "   - Create MySQL source (fraud_data)"
+	@echo "   - Create PostgreSQL source (fraud_analytics)"
+	@echo "   - Create connections to destination"
+	@echo "   - Copy both connection IDs"
+	@echo ""
+	@echo "$(YELLOW)2. Configure Airflow Variables$(NC)"
+	@echo "   $(GREEN)make setup-fraud-pipeline$(NC)"
+	@echo ""
+	@echo "$(YELLOW)3. Deploy the DAG$(NC)"
+	@echo "   - Copy fraud_airbyte_pipeline.py to dags/"
+	@echo "   - Git push (auto-syncs) OR make upgrade"
+	@echo ""
+	@echo "$(YELLOW)4. Verify & Run$(NC)"
+	@echo "   $(GREEN)make check-fraud-dag$(NC)         # Check DAG loaded"
+	@echo "   $(GREEN)make unpause-fraud-pipeline$(NC)  # Enable DAG"
+	@echo "   $(GREEN)make trigger-fraud-pipeline$(NC)  # Run manually"
+	@echo ""
+	@echo "$(CYAN)🔍 Monitoring:$(NC)"
+	@echo "   $(GREEN)make fraud-pipeline-status$(NC)   # Overall status"
+	@echo "   $(GREEN)make verify-fraud-data$(NC)       # Check data"
+	@echo "   $(GREEN)make logs-scheduler$(NC)          # View logs"
+	@echo ""
 	@echo "$(CYAN)📚 Documentation:$(NC)"
-	@echo "  Airbyte Cloud: docs/AIRBYTE_CLOUD.md"
-	@echo "  Architecture:  docs/ARCHITECTURE.md"
-	@echo "  Deployment:    docs/DEPLOYMENT.md"
-	@cat docs/AIRBYTE_CLOUD.md 2>/dev/null || echo "$(YELLOW)Documentation not found$(NC)"
+	@echo "   See: FRAUD_PIPELINE_SETUP.md"
 
-show-urls: ## Show all service URLs
-	@echo "$(CYAN)🌐 Service URLs:$(NC)"
-	@echo ""
-	@echo "$(GREEN)Local Services:$(NC)"
-	@echo "  Airflow:     http://localhost:8080  (admin/admin)"
-	@echo "  PgAdmin:     http://localhost:8888  (admin@admin.com/admin)"
-	@echo "  phpMyAdmin:  http://localhost:8889  (airflow/airflow123)"
-	@echo "  MySQL:       localhost:3307         (direct connection)"
-	@echo "  PostgreSQL:  localhost:5433         (direct connection)"
-	@echo ""
-	@echo "$(GREEN)Cloud Services:$(NC)"
-	@echo "  Airbyte:   https://cloud.airbyte.com"
-	@echo ""
-	@echo "$(YELLOW)To access local services, run:$(NC)"
-	@echo "  Airflow:     make airflow-ui"
-	@echo "  PgAdmin:     make pgadmin-ui"
-	@echo "  phpMyAdmin:  make phpmyadmin-ui"
-	@echo "  MySQL:       make mysql-connect"
-	@echo "  PostgreSQL:  make postgres-connect"
+
 
 # ============================================================================
-# DEVELOPMENT
+# SODA DATA QUALITY INTEGRATION (KUBERNETES POD OPERATOR)
 # ============================================================================
 
-dev-setup: setup ## Alias for setup (for development)
+.PHONY: setup-soda-k8s install-k8s-provider setup-soda-rbac setup-soda-vars test-soda-dag
 
-dev-reset: uninstall-all setup ## Complete reset and redeploy
+setup-soda-k8s: install-k8s-provider setup-soda-rbac setup-soda-vars ## Complete Soda + K8s setup
+	@echo "$(GREEN)✓ Soda K8s integration complete!$(NC)"
+	@echo ""
+	@echo "$(CYAN)📋 Next Steps:$(NC)"
+	@echo "  1. Commit Soda files to GitHub: $(YELLOW)cd ~/Documents/git-projects/Fraud-Airbyte-Project && git add . && git commit -m 'Add Soda K8s' && git push$(NC)"
+	@echo "  2. Wait 60 seconds for git-sync"
+	@echo "  3. Test the DAG: $(GREEN)make test-soda-dag$(NC)"
 
-quick-restart: restart-airflow ## Quick restart without rebuild
+install-k8s-provider: ## Install Kubernetes provider for Airflow
+	@echo "$(YELLOW)━━━ Installing Kubernetes Provider ━━━$(NC)"
+	@if ! grep -q "apache-airflow-providers-cncf-kubernetes" requirements.txt; then \
+		echo "" >> requirements.txt; \
+		echo "# Kubernetes Provider for KubernetesPodOperator" >> requirements.txt; \
+		echo "apache-airflow-providers-cncf-kubernetes>=8.0.0" >> requirements.txt; \
+		echo "$(CYAN)  Added to requirements.txt$(NC)"; \
+		echo "$(YELLOW)  Rebuilding Airflow image...$(NC)"; \
+		$(MAKE) upgrade; \
+	else \
+		echo "$(GREEN)  ✓ Kubernetes provider already in requirements.txt$(NC)"; \
+	fi
+
+setup-soda-rbac: ## Create Kubernetes RBAC for Airflow workers
+	@echo "$(YELLOW)━━━ Setting up Kubernetes RBAC ━━━$(NC)"
+	@kubectl apply -f ../k8s/airflow-worker-rbac.yaml
+	@echo "$(GREEN)✓ RBAC configured$(NC)"
+
+
+
+setup-soda-vars: check-snowflake-creds ## Verify Snowflake variables are set
+	@echo "$(YELLOW)━━━ Verifying Snowflake Variables ━━━$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables list 2>/dev/null | grep -q SNOWFLAKE_ACCOUNT || \
+		(echo "$(RED)ERROR: Snowflake variables not set!$(NC)" && \
+		 echo "$(YELLOW)Run: make setup-snowflake-connection$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Snowflake variables configured$(NC)"
+
+test-soda-dag: ## Test Soda K8s DAG
+	@echo "$(YELLOW)━━━ Testing Soda K8s DAG ━━━$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Checking if DAG is loaded...$(NC)"
+	@if kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list 2>/dev/null | grep -q "fraud_detection_with_soda_k8s"; then \
+		echo "$(GREEN)  ✓ DAG found$(NC)"; \
+	else \
+		echo "$(RED)  ✗ DAG not found. Wait 60s for git-sync or check errors:$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+			airflow dags list-import-errors 2>/dev/null | grep fraud || true; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "$(CYAN)2. Checking for import errors...$(NC)"
+	@if kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list-import-errors 2>/dev/null | grep -q fraud_detection_with_soda_k8s; then \
+		echo "$(RED)  ✗ Import errors found:$(NC)"; \
+		kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+			airflow dags list-import-errors 2>/dev/null | grep -A 10 fraud_detection_with_soda_k8s; \
+		exit 1; \
+	else \
+		echo "$(GREEN)  ✓ No import errors$(NC)"; \
+	fi
+	@echo ""
+	@echo "$(CYAN)3. Unpausing DAG...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags unpause fraud_detection_with_soda_k8s 2>/dev/null || true
+	@echo "$(GREEN)  ✓ DAG unpaused$(NC)"
+	@echo ""
+	@echo "$(CYAN)4. Triggering test run...$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags trigger fraud_detection_with_soda_k8s
+	@echo "$(GREEN)  ✓ DAG triggered$(NC)"
+	@echo ""
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║              🎉 SODA K8S DAG TRIGGERED! 🎉                 ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)📊 Monitor the DAG:$(NC)"
+	@echo "  UI: $(GREEN)make port-forward$(NC) → http://localhost:8080"
+	@echo "  Pods: $(GREEN)watch kubectl get pods -n airflow$(NC)"
+	@echo "  Logs: $(GREEN)make logs-soda-check$(NC)"
+
+logs-soda-check: ## View Soda quality check logs
+	@echo "$(YELLOW)━━━ Soda Quality Check Logs ━━━$(NC)"
+	@echo ""
+	@POD=$$(kubectl get pods -n $(NAMESPACE) -l app=soda-transactions-check -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+	if [ -z "$$POD" ]; then \
+		echo "$(YELLOW)No Soda pods found yet. Trying by name pattern...$(NC)"; \
+		POD=$$(kubectl get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep soda | awk '{print $$1}' | head -1); \
+	fi; \
+	if [ -z "$$POD" ]; then \
+		echo "$(RED)No Soda pods found. DAG may not have run yet.$(NC)"; \
+		echo "$(CYAN)Try: make test-soda-dag$(NC)"; \
+	else \
+		echo "$(GREEN)Showing logs for pod: $$POD$(NC)"; \
+		kubectl logs -n $(NAMESPACE) $$POD --tail=100 -f; \
+	fi
+
+verify-k8s-provider: ## Verify Kubernetes provider is installed
+	@echo "$(YELLOW)━━━ Verifying Kubernetes Provider ━━━$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		python -c "from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator; print('$(GREEN)✓ Kubernetes provider installed$(NC)')" \
+		|| echo "$(RED)✗ Kubernetes provider NOT installed. Run: make install-k8s-provider$(NC)"
+
+verify-soda-image: ## Test if Soda Docker image is accessible
+	@echo "$(YELLOW)━━━ Testing Soda Docker Image ━━━$(NC)"
+	@kubectl run soda-test --image=sodadata/soda-core:latest --rm -i --restart=Never --namespace=$(NAMESPACE) -- soda --version \
+		&& echo "$(GREEN)✓ Soda image accessible$(NC)" \
+		|| echo "$(RED)✗ Cannot pull Soda image$(NC)"
+
+check-soda-status: ## Complete status check for Soda integration
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║           SODA K8S INTEGRATION STATUS CHECK               ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)1. Kubernetes Provider:$(NC)"
+	@$(MAKE) verify-k8s-provider 2>&1 | grep -E "✓|✗" || true
+	@echo ""
+	@echo "$(CYAN)2. RBAC Configuration:$(NC)"
+	@kubectl get serviceaccount airflow-worker -n $(NAMESPACE) >/dev/null 2>&1 \
+		&& echo "$(GREEN)  ✓ ServiceAccount exists$(NC)" \
+		|| echo "$(RED)  ✗ ServiceAccount missing. Run: make setup-soda-rbac$(NC)"
+	@echo ""
+	@echo "$(CYAN)3. Snowflake Variables:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow variables list 2>/dev/null | grep -q SNOWFLAKE_ACCOUNT \
+		&& echo "$(GREEN)  ✓ Variables configured$(NC)" \
+		|| echo "$(RED)  ✗ Variables missing. Run: make setup-snowflake-connection$(NC)"
+	@echo ""
+	@echo "$(CYAN)4. DAG Status:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list 2>/dev/null | grep fraud_detection_with_soda_k8s >/dev/null 2>&1 \
+		&& echo "$(GREEN)  ✓ DAG loaded$(NC)" \
+		|| echo "$(YELLOW)  ⚠ DAG not loaded yet (wait for git-sync)$(NC)"
+	@echo ""
+	@echo "$(CYAN)5. Recent DAG Runs:$(NC)"
+	@kubectl exec -n $(NAMESPACE) deploy/airflow-scheduler -c scheduler -- \
+		airflow dags list-runs -d fraud_detection_with_soda_k8s --limit 3 2>/dev/null \
+		|| echo "$(YELLOW)  No runs yet$(NC)"
+
+soda-help: ## Show Soda integration help
+	@echo "$(BLUE)╔════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║     SODA DATA QUALITY WITH KUBERNETES - QUICK START       ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "$(CYAN)📋 Setup Steps:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1. Complete Setup (Automated):$(NC)"
+	@echo "   $(GREEN)make setup-soda-k8s$(NC)"
+	@echo "   This will:"
+	@echo "   - Install Kubernetes provider"
+	@echo "   - Configure RBAC for pod creation"
+	@echo "   - Verify Snowflake variables"
+	@echo ""
+	@echo "$(YELLOW)2. Create Soda Files in GitHub:$(NC)"
+	@echo "   $(GREEN)cd ~/Documents/git-projects/Fraud-Airbyte-Project$(NC)"
+	@echo "   $(GREEN)# Create soda/checks/*.yml and DAG file$(NC)"
+	@echo "   $(GREEN)git add . && git commit -m 'Add Soda' && git push$(NC)"
+	@echo ""
+	@echo "$(YELLOW)3. Wait for Git-Sync (60 seconds):$(NC)"
+	@echo "   $(GREEN)sleep 60$(NC)"
+	@echo ""
+	@echo "$(YELLOW)4. Test the DAG:$(NC)"
+	@echo "   $(GREEN)make test-soda-dag$(NC)"
+	@echo ""
+	@echo "$(CYAN)🔍 Monitoring:$(NC)"
+	@echo "   Status: $(GREEN)make check-soda-status$(NC)"
+	@echo "   Logs: $(GREEN)make logs-soda-check$(NC)"
+	@echo "   UI: $(GREEN)make port-forward$(NC)"
+	@echo ""
+	@echo "$(CYAN)🧪 Testing:$(NC)"
+	@echo "   Verify provider: $(GREEN)make verify-k8s-provider$(NC)"
+	@echo "   Test Soda image: $(GREEN)make verify-soda-image$(NC)"
+
+check-snowflake-creds:
+	@if [ -z "$(SNOWFLAKE_USER)" ] || [ -z "$(SNOWFLAKE_PASSWORD)" ]; then \
+		echo "$(RED)ERROR: Snowflake credentials not set!$(NC)"; \
+		echo "$(YELLOW)Create a .env file with:$(NC)"; \
+		echo "  SNOWFLAKE_USER=your_user"; \
+		echo "  SNOWFLAKE_PASSWORD=your_password"; \
+		echo "  SNOWFLAKE_ACCOUNT=your_account"; \
+		echo "  SNOWFLAKE_WAREHOUSE=your_warehouse"; \
+		echo "  SNOWFLAKE_ROLE=your_role"; \
+		exit 1; \
+	fi
