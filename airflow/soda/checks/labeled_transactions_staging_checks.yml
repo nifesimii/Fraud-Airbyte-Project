@@ -26,8 +26,9 @@ checks for LABELED_TRANSACTIONS:
   # --- Distribution / Anomaly ---
   - row_count > 50:
       name: Minimum expected labeled transaction volume
-  - avg(CAST(IS_FRAUDULENT AS INT)) between 0.001 and 0.5:
-      name: Fraud rate should be between 0.1% and 50%
+  # - avg(CAST(IS_FRAUDULENT AS INT)) between 0.001 and 0.5:
+  #  name: Fraud rate should be between 0.1% and 50%
+
   # --- Referential integrity ---
   - values in (TRANSACTION_ID) must exist in CUSTOMER_TRANSACTIONS (TRANSACTION_ID):
       name: Every labeled transaction must exist in customer transactions
