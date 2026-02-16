@@ -1,23 +1,60 @@
-checks for customers:
-  # Completeness
-  - missing_count(customer_id) = 0
-  - missing_count(email) = 0
-  
-  # Validity
-  - invalid_count(email) = 0:
-      valid format: email
-  - duplicate_count(customer_id) = 0
-  - duplicate_count(email) = 0
-  
-  # Schema Check
+# ================================================================
+# Soda Quality Checks - CUSTOMER_TRANSACTIONS
+# Columns: TRANSACTION_ID (NUMBER), USER_ID (NUMBER), AMOUNT (FLOAT),
+#          TRANSACTION_DATE (VARCHAR), _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
+#          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
+#          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
+# ================================================================
+checks for CUSTOMER_TRANSACTIONS:
+
+  # --- Completeness ---
+  - row_count > 0:
+      name: Table must not be empty
+  - missing_count(TRANSACTION_ID) = 0:
+      name: Transaction ID must not be null
+  - missing_count(USER_ID) = 0:
+      name: User ID must not be null
+  - missing_count(AMOUNT) = 0:
+      name: Amount must not be null
+  - missing_count(TRANSACTION_DATE) = 0:
+      name: Transaction date must not be null
+
+  # --- Uniqueness ---
+  - duplicate_count(TRANSACTION_ID) = 0:
+      name: Transaction IDs must be unique
+
+  # --- Validity ---
+  - min(AMOUNT) > 0:
+      name: All amounts must be positive
+  - max(AMOUNT) < 1000000:
+      name: No amount should exceed 1M (possible data error)
+  - min(USER_ID) > 0:
+      name: User IDs must be positive
+  - min(TRANSACTION_ID) > 0:
+      name: Transaction IDs must be positive
+
+  # --- Distribution / Anomaly ---
+  - avg(AMOUNT) between 10 and 10000:
+      name: Average transaction amount in expected range
+  - row_count > 100:
+      name: Minimum expected transaction volume
+
+  # --- Airbyte pipeline health ---
+  - missing_count(_AIRBYTE_RAW_ID) = 0:
+      name: Airbyte raw ID must not be null (pipeline integrity)
+  - duplicate_count(_AIRBYTE_RAW_ID) = 0:
+      name: Airbyte raw IDs must be unique (no duplicate ingestion)
+
+  # --- Schema ---
   - schema:
       warn:
-        when required column missing: 
-          - customer_id
-          - email
-          - first_name
-          - last_name
+        when required column missing:
+          - TRANSACTION_ID
+          - USER_ID
+          - AMOUNT
+          - TRANSACTION_DATE
       fail:
-        when forbidden column present: 
-          - ssn
-          - credit_card
+        when forbidden column present:
+          - SSN
+          - CREDIT_CARD_NUMBER
+          - PASSWORD

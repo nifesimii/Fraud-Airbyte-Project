@@ -1,35 +1,52 @@
-Soda Quality Checks for Fraud Detection - Transactions Table
+# ================================================================
+# Soda Quality Checks - LABELED_TRANSACTIONS
+# Columns: TRANSACTION_ID (NUMBER), IS_FRAUDULENT (BOOLEAN),
+#          _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
+#          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
+#          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
+# ================================================================
+checks for LABELED_TRANSACTIONS:
 
-checks for transactions:
-  # Completeness Checks
-  - row_count > 100:
-      name: Minimum transaction volume check
-  - missing_count(transaction_id) = 0:
+  # --- Completeness ---
+  - row_count > 0:
+      name: Table must not be empty
+  - missing_count(TRANSACTION_ID) = 0:
       name: Transaction ID must not be null
-  - missing_count(customer_id) = 0:
-      name: Customer ID must not be null
-  - missing_count(amount) = 0:
-      name: Amount must not be null
-  - missing_count(transaction_timestamp) = 0:
-      name: Timestamp must not be null
-  
-  # Validity Checks
-  - duplicate_count(transaction_id) = 0:
-      name: Transaction IDs must be unique
-  - invalid_count(amount) = 0:
-      name: Amount must be positive and within range
-      valid min: 0.01
-      valid max: 1000000
-  - invalid_count(transaction_type) = 0:
-      name: Transaction type must be valid
-      valid values: ['purchase', 'refund', 'transfer', 'withdrawal', 'deposit']
-  
-  # Freshness Check
-  - freshness(transaction_timestamp) < 1d:
-      name: Data should be less than 1 day old
-  
-  # Distribution Checks
-  - avg(amount) between 10 and 5000:
-      name: Average transaction amount in expected range
-  - row_count change < 50%:
-      name: Row count should not change drastically
+  - missing_count(IS_FRAUDULENT) = 0:
+      name: Fraud label must not be null
+
+  # --- Uniqueness ---
+  - duplicate_count(TRANSACTION_ID) = 0:
+      name: Transaction IDs must be unique (one label per transaction)
+
+  # --- Validity ---
+  - min(TRANSACTION_ID) > 0:
+      name: Transaction IDs must be positive
+
+  # --- Distribution / Anomaly ---
+  - row_count > 50:
+      name: Minimum expected labeled transaction volume
+  - avg(IS_FRAUDULENT) between 0.001 and 0.5:
+      name: Fraud rate should be between 0.1% and 50%
+
+  # --- Referential integrity ---
+  - values in (TRANSACTION_ID) must exist in CUSTOMER_TRANSACTIONS (TRANSACTION_ID):
+      name: Every labeled transaction must exist in customer transactions
+
+  # --- Airbyte pipeline health ---
+  - missing_count(_AIRBYTE_RAW_ID) = 0:
+      name: Airbyte raw ID must not be null (pipeline integrity)
+  - duplicate_count(_AIRBYTE_RAW_ID) = 0:
+      name: Airbyte raw IDs must be unique (no duplicate ingestion)
+
+  # --- Schema ---
+  - schema:
+      warn:
+        when required column missing:
+          - TRANSACTION_ID
+          - IS_FRAUDULENT
+      fail:
+        when forbidden column present:
+          - SSN
+          - CREDIT_CARD_NUMBER
+          - PASSWORD
