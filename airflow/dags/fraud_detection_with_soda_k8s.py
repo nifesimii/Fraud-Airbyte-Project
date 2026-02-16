@@ -226,7 +226,7 @@ with DAG(
     soda_check_transactions = KubernetesPodOperator(
         task_id="soda_quality_check_transactions",
         name="soda-transactions-check",
-        cmds=soda_scan_command("transactions_checks.yml")[0:2],
+        cmds=soda_scan_command("labelled_transactions_staging_checks.yml")[0:2],
         arguments=[soda_scan_command("transactions_checks.yml")[2]],
         **SODA_POD_DEFAULTS,
     )
@@ -237,7 +237,7 @@ with DAG(
     soda_check_customers = KubernetesPodOperator(
         task_id="soda_quality_check_customers",
         name="soda-customers-check",
-        cmds=soda_scan_command("customers_checks.yml")[0:2],
+        cmds=soda_scan_command("customers_staging_checks.yml")[0:2],
         arguments=[soda_scan_command("customers_checks.yml")[2]],
         **SODA_POD_DEFAULTS,
     )

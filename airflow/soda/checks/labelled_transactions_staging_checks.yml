@@ -5,7 +5,7 @@
 #          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
 #          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
 # ================================================================
-checks for LABELED_TRANSACTIONS:
+checks for LABELED_TRANSACTIONs:
 
   # --- Completeness ---
   - row_count > 0:

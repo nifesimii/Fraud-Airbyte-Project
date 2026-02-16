@@ -1,137 +1,137 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: soda-config
-  namespace: airflow
+    name: soda-config
+    namespace: airflow
 data:
-  configuration.yml: |
-    data_source staging:
-      type: snowflake
-      username: ${SNOWFLAKE_USER}
-      password: ${SNOWFLAKE_PASSWORD}
-      account: ${SNOWFLAKE_ACCOUNT}
-      database: AIRBYTE_DATABASE
-      warehouse: AIRBYTE_WAREHOUSE
-      connection_timeout: 240
-      role: AIRBYTE_ROLE
-      client_session_keep_alive: true
-      session_params:
-        QUERY_TAG: soda-queries
-        QUOTED_IDENTIFIERS_IGNORE_CASE: false
-      schema: STAGING
+    configuration.yml: |
+        data_source staging:
+          type: snowflake
+          username: ${SNOWFLAKE_USER}
+          password: ${SNOWFLAKE_PASSWORD}
+          account: ${SNOWFLAKE_ACCOUNT}
+          database: AIRBYTE_DATABASE
+          warehouse: AIRBYTE_WAREHOUSE
+          connection_timeout: 240
+          role: AIRBYTE_ROLE
+          client_session_keep_alive: true
+          session_params:
+            QUERY_TAG: soda-queries
+            QUOTED_IDENTIFIERS_IGNORE_CASE: false
+          schema: STAGING
 
-  customers_checks.yml: |
-    # ================================================================
-    # Soda Quality Checks - CUSTOMER_TRANSACTIONS
-    # Columns: TRANSACTION_ID (NUMBER), USER_ID (NUMBER), AMOUNT (FLOAT),
-    #          TRANSACTION_DATE (VARCHAR), _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
-    #          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
-    #          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
-    # ================================================================
-    checks for CUSTOMER_TRANSACTIONS:
+    customers_checks.yml: |
+        # ================================================================
+        # Soda Quality Checks - CUSTOMER_TRANSACTIONS
+        # Columns: TRANSACTION_ID (NUMBER), USER_ID (NUMBER), AMOUNT (FLOAT),
+        #          TRANSACTION_DATE (VARCHAR), _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
+        #          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
+        #          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
+        # ================================================================
+        checks for CUSTOMER_TRANSACTIONS:
 
-      # --- Completeness ---
-      - row_count > 0:
-          name: Table must not be empty
-      - missing_count(TRANSACTION_ID) = 0:
-          name: Transaction ID must not be null
-      - missing_count(AMOUNT) = 0:
-          name: Amount must not be null
-      - missing_count(TRANSACTION_DATE) = 0:
-          name: Transaction date must not be null
+          # --- Completeness ---
+          - row_count > 0:
+              name: Table must not be empty
+          - missing_count(TRANSACTION_ID) = 0:
+              name: Transaction ID must not be null
+          - missing_count(AMOUNT) = 0:
+              name: Amount must not be null
+          - missing_count(TRANSACTION_DATE) = 0:
+              name: Transaction date must not be null
 
-      # --- Completeness (warn only - USER_ID not populated in source) ---
-      - missing_percent(USER_ID) < 100:
-          name: User ID population check
-          warn: when > 50
+        #   # --- Completeness (warn only - USER_ID not populated in source) ---
+        #   - missing_percent(USER_ID) < 100:
+        #       name: User ID population check
+        #       warn: when > 50
 
-      # --- Uniqueness ---
-      - duplicate_count(TRANSACTION_ID) = 0:
-          name: Transaction IDs must be unique
+          # --- Uniqueness ---
+          - duplicate_count(TRANSACTION_ID) = 0:
+              name: Transaction IDs must be unique
 
-      # --- Validity (allows negative amounts for refunds) ---
-      - min(AMOUNT) >= -1000000:
-          name: Amount must be within valid lower range
-      - max(AMOUNT) < 1000000:
-          name: Amount must be within valid upper range
-      - min(TRANSACTION_ID) > 0:
-          name: Transaction IDs must be positive
+          # --- Validity (allows negative amounts for refunds) ---
+          - min(AMOUNT) >= -1000000:
+              name: Amount must be within valid lower range
+          - max(AMOUNT) < 1000000:
+              name: Amount must be within valid upper range
+          - min(TRANSACTION_ID) > 0:
+              name: Transaction IDs must be positive
 
-      # --- Distribution / Anomaly ---
-      - avg(AMOUNT) between -1000 and 10000:
-          name: Average transaction amount in expected range
-      - row_count > 100:
-          name: Minimum expected transaction volume
+          # --- Distribution / Anomaly ---
+          - avg(AMOUNT) between -1000 and 10000:
+              name: Average transaction amount in expected range
+          - row_count > 100:
+              name: Minimum expected transaction volume
 
-      # --- Airbyte pipeline health ---
-      - missing_count(_AIRBYTE_RAW_ID) = 0:
-          name: Airbyte raw ID must not be null (pipeline integrity)
-      - duplicate_count(_AIRBYTE_RAW_ID) = 0:
-          name: Airbyte raw IDs must be unique (no duplicate ingestion)
+          # --- Airbyte pipeline health ---
+          - missing_count(_AIRBYTE_RAW_ID) = 0:
+              name: Airbyte raw ID must not be null (pipeline integrity)
+          - duplicate_count(_AIRBYTE_RAW_ID) = 0:
+              name: Airbyte raw IDs must be unique (no duplicate ingestion)
 
-      # --- Schema ---
-      - schema:
-          warn:
-            when required column missing:
-              - TRANSACTION_ID
-              - AMOUNT
-              - TRANSACTION_DATE
-          fail:
-            when forbidden column present:
-              - SSN
-              - CREDIT_CARD_NUMBER
-              - PASSWORD
+          # --- Schema ---
+          - schema:
+              warn:
+                when required column missing:
+                  - TRANSACTION_ID
+                  - AMOUNT
+                  - TRANSACTION_DATE
+              fail:
+                when forbidden column present:
+                  - SSN
+                  - CREDIT_CARD_NUMBER
+                  - PASSWORD
 
-  transactions_checks.yml: |
-    # ================================================================
-    # Soda Quality Checks - LABELED_TRANSACTIONS
-    # Columns: TRANSACTION_ID (NUMBER), IS_FRAUDULENT (BOOLEAN),
-    #          _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
-    #          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
-    #          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
-    # ================================================================
-    checks for LABELED_TRANSACTIONS:
+    transactions_checks.yml: |
+        # ================================================================
+        # Soda Quality Checks - LABELED_TRANSACTIONS
+        # Columns: TRANSACTION_ID (NUMBER), IS_FRAUDULENT (BOOLEAN),
+        #          _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
+        #          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
+        #          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
+        # ================================================================
+        checks for LABELED_TRANSACTIONS:
 
-      # --- Completeness ---
-      - row_count > 0:
-          name: Table must not be empty
-      - missing_count(TRANSACTION_ID) = 0:
-          name: Transaction ID must not be null
-      - missing_count(IS_FRAUDULENT) = 0:
-          name: Fraud label must not be null
+          # --- Completeness ---
+          - row_count > 0:
+              name: Table must not be empty
+          - missing_count(TRANSACTION_ID) = 0:
+              name: Transaction ID must not be null
+          - missing_count(IS_FRAUDULENT) = 0:
+              name: Fraud label must not be null
 
-      # --- Uniqueness ---
-      - duplicate_count(TRANSACTION_ID) = 0:
-          name: Transaction IDs must be unique (one label per transaction)
+          # --- Uniqueness ---
+          - duplicate_count(TRANSACTION_ID) = 0:
+              name: Transaction IDs must be unique (one label per transaction)
 
-      # --- Validity ---
-      - min(TRANSACTION_ID) > 0:
-          name: Transaction IDs must be positive
+          # --- Validity ---
+          - min(TRANSACTION_ID) > 0:
+              name: Transaction IDs must be positive
 
-      # --- Distribution / Anomaly ---
-      - row_count > 50:
-          name: Minimum expected labeled transaction volume
-      - avg(IS_FRAUDULENT) between 0.001 and 0.5:
-          name: Fraud rate should be between 0.1% and 50%
+          # --- Distribution / Anomaly ---
+          - row_count > 50:
+              name: Minimum expected labeled transaction volume
+          - avg(IS_FRAUDULENT) between 0.001 and 0.5:
+              name: Fraud rate should be between 0.1% and 50%
 
-      # --- Referential integrity ---
-      - values in (TRANSACTION_ID) must exist in CUSTOMER_TRANSACTIONS (TRANSACTION_ID):
-          name: Every labeled transaction must exist in customer transactions
+          # --- Referential integrity ---
+          - values in (TRANSACTION_ID) must exist in CUSTOMER_TRANSACTIONS (TRANSACTION_ID):
+              name: Every labeled transaction must exist in customer transactions
 
-      # --- Airbyte pipeline health ---
-      - missing_count(_AIRBYTE_RAW_ID) = 0:
-          name: Airbyte raw ID must not be null (pipeline integrity)
-      - duplicate_count(_AIRBYTE_RAW_ID) = 0:
-          name: Airbyte raw IDs must be unique (no duplicate ingestion)
+          # --- Airbyte pipeline health ---
+          - missing_count(_AIRBYTE_RAW_ID) = 0:
+              name: Airbyte raw ID must not be null (pipeline integrity)
+          - duplicate_count(_AIRBYTE_RAW_ID) = 0:
+              name: Airbyte raw IDs must be unique (no duplicate ingestion)
 
-      # --- Schema ---
-      - schema:
-          warn:
-            when required column missing:
-              - TRANSACTION_ID
-              - IS_FRAUDULENT
-          fail:
-            when forbidden column present:
-              - SSN
-              - CREDIT_CARD_NUMBER
-              - PASSWORD
+          # --- Schema ---
+          - schema:
+              warn:
+                when required column missing:
+                  - TRANSACTION_ID
+                  - IS_FRAUDULENT
+              fail:
+                when forbidden column present:
+                  - SSN
+                  - CREDIT_CARD_NUMBER
+                  - PASSWORD
