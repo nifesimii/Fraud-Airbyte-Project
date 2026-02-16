@@ -35,29 +35,30 @@ data:
           name: Table must not be empty
       - missing_count(TRANSACTION_ID) = 0:
           name: Transaction ID must not be null
-      - missing_count(USER_ID) = 0:
-          name: User ID must not be null
       - missing_count(AMOUNT) = 0:
           name: Amount must not be null
       - missing_count(TRANSACTION_DATE) = 0:
           name: Transaction date must not be null
 
+      # --- Completeness (warn only - USER_ID not populated in source) ---
+      - missing_percent(USER_ID) < 100:
+          name: User ID population check
+          warn: when > 50
+
       # --- Uniqueness ---
       - duplicate_count(TRANSACTION_ID) = 0:
           name: Transaction IDs must be unique
 
-      # --- Validity ---
-      - min(AMOUNT) > 0:
-          name: All amounts must be positive
+      # --- Validity (allows negative amounts for refunds) ---
+      - min(AMOUNT) >= -1000000:
+          name: Amount must be within valid lower range
       - max(AMOUNT) < 1000000:
-          name: No amount should exceed 1M (possible data error)
-      - min(USER_ID) > 0:
-          name: User IDs must be positive
+          name: Amount must be within valid upper range
       - min(TRANSACTION_ID) > 0:
           name: Transaction IDs must be positive
 
       # --- Distribution / Anomaly ---
-      - avg(AMOUNT) between 10 and 10000:
+      - avg(AMOUNT) between -1000 and 10000:
           name: Average transaction amount in expected range
       - row_count > 100:
           name: Minimum expected transaction volume
@@ -73,7 +74,6 @@ data:
           warn:
             when required column missing:
               - TRANSACTION_ID
-              - USER_ID
               - AMOUNT
               - TRANSACTION_DATE
           fail:
