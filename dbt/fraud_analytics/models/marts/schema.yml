@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: customer_metrics
+    description: "Aggregated customer-level transaction and fraud metrics"
+    columns:
+      - name: user_id
+        description: "Unique customer identifier"
+        tests:
+          - unique
+          - not_null
+      - name: total_transactions
+        description: "Total number of transactions"
+        tests:
+          - not_null
+      - name: fraud_count
+        description: "Number of fraudulent transactions"
+      - name: fraud_rate_pct
+        description: "Percentage of transactions flagged as fraud"

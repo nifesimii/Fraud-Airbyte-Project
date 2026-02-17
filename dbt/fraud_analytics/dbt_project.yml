@@ -1,0 +1,13 @@
+name: fraud_analytics
+version: '1.0.0'
+profile: fraud_analytics
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  fraud_analytics:
+    marts:
+      +materialized: table
+      +schema: marts

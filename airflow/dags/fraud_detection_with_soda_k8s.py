@@ -4,6 +4,7 @@ Fraud Detection Pipeline with Soda Data Quality Checks (KubernetesPodOperator)
 - Airbyte Cloud syncs triggered via REST API (no airbyte provider needed)
 - Fresh Airbyte access token fetched at runtime via client_credentials grant
 - Soda checks run in isolated K8s pods with config mounted from ConfigMap
+- dbt transforms run via Cosmos (astronomer-cosmos) after quality checks pass
 - Soda files: soda/configuration.yml, soda/checks/*.yml
 - ConfigMap: k8s/soda-configmap.yaml
 
@@ -13,13 +14,14 @@ Credentials are loaded from environment variables (via K8s Secret "airbyte-secre
 import os
 import requests
 from datetime import datetime, timedelta
-import json
 import time
 
 from airflow.sdk import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from kubernetes.client import models as k8s
+from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, RenderConfig
+from cosmos.profiles import SnowflakeUserPasswordProfileMapping
 
 
 # ===================================================================
@@ -189,11 +191,11 @@ default_args = {
 with DAG(
     dag_id="fraud_detection_with_soda_k8s",
     default_args=default_args,
-    description="Fraud detection pipeline with Soda quality checks via K8s pods",
+    description="Fraud detection pipeline with Soda quality checks and dbt transforms",
     schedule=timedelta(hours=6),
     start_date=datetime(2025, 1, 1),
     catchup=False,
-    tags=["fraud", "soda", "data-quality", "kubernetes"],
+    tags=["fraud", "soda", "dbt", "data-quality", "kubernetes"],
 ) as dag:
 
     # -----------------------------------------------------------------
@@ -243,9 +245,32 @@ with DAG(
     )
 
     # -----------------------------------------------------------------
-    # STEP 5: Pipeline dependencies
+    # STEP 5: dbt — Build customer metrics table in Snowflake
     # -----------------------------------------------------------------
-    get_airbyte_token >> trigger_airbyte_sync >> wait_for_sync >> [
-        soda_check_transactions,
-        soda_check_customers,
-    ]
+    dbt_customer_metrics = DbtTaskGroup(
+        group_id="dbt_customer_metrics",
+        project_config=ProjectConfig(
+            dbt_project_path="/opt/airflow/dags/repo/dbt/fraud_analytics",
+        ),
+        profile_config=ProfileConfig(
+            profile_name="fraud_analytics",
+            target_name="prod",
+            profile_mapping=SnowflakeUserPasswordProfileMapping(
+                conn_id="snowflake_default",
+            ),
+        ),
+        render_config=RenderConfig(
+            select=["path:models/marts/customer_metrics.sql"],
+        ),
+    )
+
+    # -----------------------------------------------------------------
+    # Pipeline dependencies
+    # -----------------------------------------------------------------
+    (
+        get_airbyte_token
+        >> trigger_airbyte_sync
+        >> wait_for_sync
+        >> [soda_check_transactions, soda_check_customers]
+        >> dbt_customer_metrics
+    )

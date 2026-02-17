@@ -106,7 +106,7 @@ install: pull-postgres update-values setup-helm create-k8s-resources ## Install 
 		--set createUserJob.useHelmHooks=false \
 		--set scheduler.waitForMigrations.enabled=false \
 		--set webserver.waitForMigrations.enabled=false \
-		--set apiServer.waitForMigrations.enabled=false \
+		--set api-Server.waitForMigrations.enabled=false \
 		--set triggerer.waitForMigrations.enabled=false \
 		--set dagProcessor.waitForMigrations.enabled=false \
 		--timeout 5m || echo "$(YELLOW)⚠ Helm timeout (expected)$(NC)"

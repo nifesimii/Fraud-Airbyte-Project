@@ -87,9 +87,6 @@
 #   - name: AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE
 #     value: "True"
 
-
-
-
 executor: "KubernetesExecutor"
 cleanUpPods: false
 

@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: staging
+    database: AIRBYTE_DATABASE
+    schema: STAGING
+    tables:
+      - name: CUSTOMER_TRANSACTIONS
+        description: "Raw customer transactions synced by Airbyte"
+      - name: LABELED_TRANSACTIONS
+        description: "Fraud-labeled transactions synced by Airbyte"

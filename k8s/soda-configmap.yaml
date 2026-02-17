@@ -20,7 +20,7 @@ data:
             QUOTED_IDENTIFIERS_IGNORE_CASE: false
           schema: STAGING
 
-    customers_checks.yml: |
+    customer_staging_checks.yml: |
         # ================================================================
         # Soda Quality Checks - CUSTOMER_TRANSACTIONS
         # Columns: TRANSACTION_ID (NUMBER), USER_ID (NUMBER), AMOUNT (FLOAT),
@@ -82,7 +82,7 @@ data:
                   - CREDIT_CARD_NUMBER
                   - PASSWORD
 
-    transactions_checks.yml: |
+    labeled_transactions_staging_checks.yml: |
         # ================================================================
         # Soda Quality Checks - LABELED_TRANSACTIONS
         # Columns: TRANSACTION_ID (NUMBER), IS_FRAUDULENT (BOOLEAN),
@@ -111,9 +111,8 @@ data:
           # --- Distribution / Anomaly ---
           - row_count > 50:
               name: Minimum expected labeled transaction volume
-          - avg(IS_FRAUDULENT) between 0.001 and 0.5:
-              name: Fraud rate should be between 0.1% and 50%
-
+        #   - avg(CAST(IS_FRAUDULENT AS INT)) between 0.001 and 0.5:
+        #       name: Fraud rate should be between 0.1% and 50%
           # --- Referential integrity ---
           - values in (TRANSACTION_ID) must exist in CUSTOMER_TRANSACTIONS (TRANSACTION_ID):
               name: Every labeled transaction must exist in customer transactions

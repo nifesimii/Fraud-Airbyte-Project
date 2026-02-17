@@ -1,0 +1,13 @@
+fraud_analytics:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      database: AIRBYTE_DATABASE
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: staging
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      threads: 4

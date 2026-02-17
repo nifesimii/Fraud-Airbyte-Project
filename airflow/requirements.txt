@@ -29,3 +29,7 @@ soda-core-snowflake>=3.3.0
 pyyaml>=6.0.0
 
 apache-airflow-providers-cncf-kubernetes>=8.0.0
+
+# dbt + Cosmos
+dbt-snowflake>=1.7.0
+astronomer-cosmos>=1.4.0
