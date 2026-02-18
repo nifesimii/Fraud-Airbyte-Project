@@ -193,4 +193,4 @@ env:
   - name: AIRFLOW_CONN_AIRBYTE_CLOUD
     value: "https://api.airbyte.com"
   - name: AIRFLOW_CONN_SNOWFLAKE_DEFAULT
-    value: "snowflake://NIFESIMII:Damilola16%401997%3F%3F@nzpgsnz-us68200/AIRBYTE_DATABASE/STAGING?warehouse=AIRBYTE_WAREHOUSE&role=AIRBYTE_ROLE"
+    value: '{"conn_type": "snowflake", "host": "nzpgsnz-us68200", "login": "NIFESIMII", "password": "Damilola16@1997??", "schema": "STAGING", "extra": {"database": "AIRBYTE_DATABASE", "warehouse": "AIRBYTE_WAREHOUSE", "role": "AIRBYTE_ROLE", "account": "nzpgsnz-us68200"}}'
