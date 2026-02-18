@@ -93,7 +93,7 @@ cleanUpPods: false
 images:
   airflow:
     repository: my-dags
-    tag: "20260217"
+    tag: "20260218052205"
     pullPolicy: IfNotPresent
 
 securityContexts:
