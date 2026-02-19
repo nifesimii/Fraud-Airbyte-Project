@@ -29,7 +29,7 @@ joined as (
     from transactions t
     left join fraud_labels f
         on t.transaction_id = f.transaction_id
-    where t.user_id is not null
+    {# where t.user_id is not null #}
     group by t.user_id
 )
 
