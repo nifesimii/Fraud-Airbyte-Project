@@ -93,7 +93,7 @@ cleanUpPods: false
 images:
   airflow:
     repository: my-dags
-    tag: "20260131164649"
+    tag: "20260218052205"
     pullPolicy: IfNotPresent
 
 securityContexts:
@@ -141,11 +141,12 @@ dags:
     enabled: true
     repo: https://github.com/nifesimii/Fraud-Airbyte-Project.git
     branch: main
+    ref: main # ← ADD THIS explicitly
+    rev: HEAD
     subPath: "airflow/dags"
     wait: 60
-    rev: HEAD
     depth: 1
-    maxFailures: 0
+    maxFailures: 3
 
 config:
   core:
@@ -157,13 +158,16 @@ config:
   webserver:
     expose_config: "True"
   kubernetes_executor:
-    delete_worker_pods: "False"
-    delete_worker_pods_on_failure: "False"
+    delete_worker_pods: "True"
+    delete_worker_pods_on_failure: "True"
   logging:
     base_log_folder: "/opt/airflow/logs"
     remote_logging: "False"
     logging_level: "INFO"
     fab_logging_level: "WARNING"
+  # secrets:
+  #   backend: "airflow.providers.cncf.kubernetes.secrets.secret_manager.KubernetesSecretBackend"
+  #   backend_kwargs: '{"variables_prefix": "airflow-var", "connections_prefix": "airflow-conn", "config_prefix": "airflow-config"}'
 
 extraInitContainers: |
   - name: fix-log-permissions
@@ -185,6 +189,8 @@ extraEnvFrom: |
 
 env:
   - name: AIRFLOW_CONN_POSTGRES_SOURCE
-    value: "postgresql://postgres:postgres@postgres-source.airflow.svc.cluster.local:5432/postgres"
+    value: "postgresql://postgres:postgres@postgres-source.airflow.svc.cluster.local:5432/fraud_analytics"
   - name: AIRFLOW_CONN_AIRBYTE_CLOUD
-    value: "http://https%3A%2F%2Fapi.airbyte.com"
+    value: "https://api.airbyte.com"
+  - name: AIRFLOW_CONN_SNOWFLAKE_DEFAULT
+    value: '{"conn_type": "snowflake", "host": "nzpgsnz-us68200", "login": "NIFESIMII", "password": "Damilola16@1997??", "schema": "STAGING", "extra": {"database": "AIRBYTE_DATABASE", "warehouse": "AIRBYTE_WAREHOUSE", "role": "AIRBYTE_ROLE", "account": "nzpgsnz-us68200"}}'

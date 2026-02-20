@@ -38,7 +38,7 @@ help: ## Show this help message
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-30s$(NC) %s\n", $$1, $$2}'
 
-all: clean build create-k8s-resources install wait-postgres migrate create-session patch-deployments wait-components install-all-components setup-connections status ## Complete installation
+all: clean build create-k8s-resources install wait-postgres migrate create-session patch-deployments wait-components install-all-components status ## Complete installation
 
 clean: ## Clean up existing installation
 	@echo "$(YELLOW)━━━ STEP 1: Cleanup ━━━$(NC)"
@@ -261,7 +261,12 @@ port-forward-pgadmin: ## Port-forward to PgAdmin
 	@echo "Access: $(YELLOW)http://localhost:8888$(NC)"
 	@echo "Login: $(GREEN)admin@admin.com / admin$(NC)"
 	@echo "Manages: $(YELLOW)PostgreSQL Source$(NC)"
-	@kubectl port-forward -n $(NAMESPACE) svc/pgadmin 8888:80
+	@while true; do \
+		kubectl port-forward -n airflow svc/pgadmin 8888:80; \
+		echo "Reconnecting..."; \
+		sleep 2; \
+	done
+
 
 port-forward-phpmyadmin: ## Port-forward to phpMyAdmin
 	@echo "$(GREEN)Port-forwarding to phpMyAdmin...$(NC)"

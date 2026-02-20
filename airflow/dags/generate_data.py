@@ -43,14 +43,15 @@ def fraud_detection_pipeline():
             """Create the customer_transactions table if it doesn't exist."""
             create_table_query = """
             CREATE TABLE IF NOT EXISTS customer_transactions (
-                transaction_id SERIAL PRIMARY KEY,
-                customer_id VARCHAR(100) NOT NULL,
+                transaction_id SERIAL NOT NULL,
+                customer_id INTEGER NOT NULL,
                 transaction_date TIMESTAMP NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
                 merchant VARCHAR(255),
                 location VARCHAR(255),
                 transaction_type VARCHAR(50),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (customer_id, transaction_id)
             );
             
             -- Create index for better query performance
@@ -135,7 +136,7 @@ def fraud_detection_pipeline():
         total_transactions = 0
         
         for customer_num in range(1, num_customers + 1):
-            customer_id = f"CUST{customer_num:03d}"
+            customer_id = customer_num  # strictly an integer
             num_txns = random.randint(5, 30)
             transactions = generate_transactions(customer_id, num_txns, logical_date)
             insert_transactions(transactions)

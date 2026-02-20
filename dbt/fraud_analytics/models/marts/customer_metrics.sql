@@ -3,7 +3,7 @@
 with transactions as (
     select
         transaction_id,
-        user_id,
+        customer_id,
         amount,
         transaction_date
     from {{ source('staging', 'CUSTOMER_TRANSACTIONS') }}
@@ -18,7 +18,7 @@ fraud_labels as (
 
 joined as (
     select
-        t.user_id,
+        t.customer_id,
         count(t.transaction_id) as total_transactions,
         sum(t.amount) as total_amount,
         sum(case when f.is_fraudulent then 1 else 0 end) as fraudulent_transactions,
@@ -29,12 +29,12 @@ joined as (
     from transactions t
     left join fraud_labels f
         on t.transaction_id = f.transaction_id
-    {# where t.user_id is not null #}
-    group by t.user_id
+    where t.customer_id is not null
+    group by t.customer_id
 )
 
 select
-    user_id,
+    customer_id,
     total_transactions,
     total_amount,
     fraudulent_transactions,
