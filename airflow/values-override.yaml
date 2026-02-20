@@ -189,7 +189,7 @@ extraEnvFrom: |
 
 env:
   - name: AIRFLOW_CONN_POSTGRES_SOURCE
-    value: "postgresql://postgres:postgres@postgres-source.airflow.svc.cluster.local:5432/postgres"
+    value: "postgresql://postgres:postgres@postgres-source.airflow.svc.cluster.local:5432/fraud_analytics"
   - name: AIRFLOW_CONN_AIRBYTE_CLOUD
     value: "https://api.airbyte.com"
   - name: AIRFLOW_CONN_SNOWFLAKE_DEFAULT
