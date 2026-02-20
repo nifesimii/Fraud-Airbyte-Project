@@ -37,7 +37,6 @@ def fraud_detection_pipeline():
         Generate customer transactions and insert into PostgreSQL source database.
         Database: postgres_source (fraud_analytics)
         """
-        # Use Airflow connection
         postgres_hook = PostgresHook(postgres_conn_id='postgres_source')
         
         def create_transactions_table():
@@ -92,7 +91,6 @@ def fraud_detection_pipeline():
                         minutes=random.randint(0, 59)
                     )
                 
-                # Generate realistic amounts based on transaction type
                 txn_type = random.choice(transaction_types)
                 if txn_type == 'subscription':
                     amount = round(random.uniform(5.0, 50.0), 2)
@@ -113,19 +111,18 @@ def fraud_detection_pipeline():
         
         def insert_transactions(transactions):
             """Insert transaction data into PostgreSQL."""
-            insert_query = """
-            INSERT INTO customer_transactions 
-            (customer_id, transaction_date, amount, merchant, location, transaction_type)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            
             try:
-                postgres_hook.insert_rows(
-                    table='customer_transactions',
-                    rows=transactions,
-                    target_fields=['customer_id', 'transaction_date', 'amount', 
-                                 'merchant', 'location', 'transaction_type']
-                )
+                conn = postgres_hook.get_conn()
+                cursor = conn.cursor()
+                insert_query = """
+                INSERT INTO customer_transactions 
+                (customer_id, transaction_date, amount, merchant, location, transaction_type)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                cursor.executemany(insert_query, transactions)
+                conn.commit()
+                cursor.close()
+                conn.close()
                 print(f"✅ Inserted {len(transactions)} transactions")
             except Exception as e:
                 print(f"❌ Error inserting transactions: {e}")
@@ -134,7 +131,6 @@ def fraud_detection_pipeline():
         # Main execution
         create_transactions_table()
         
-        # Generate transactions for existing customers
         num_customers = 20
         total_transactions = 0
         
@@ -155,7 +151,6 @@ def fraud_detection_pipeline():
         Reads from: postgres_source.fraud_analytics.customer_transactions
         Writes to: mysql_default.fraud_data.labeled_transactions
         """
-        # Get database connections
         postgres_hook = PostgresHook(postgres_conn_id='postgres_source')
         mysql_hook = MySqlHook(mysql_conn_id='mysql_default')
         
@@ -213,25 +208,20 @@ def fraud_detection_pipeline():
                 for transaction in transactions:
                     transaction_id, amount, merchant, location = transaction
                     
-                    # Fraud detection heuristics
                     fraud_score = 0.0
                     fraud_reasons = []
                     
-                    # High amount transactions
                     if amount > 3000:
                         fraud_score += 30
                         fraud_reasons.append('High amount')
                     
-                    # Suspicious locations
                     if 'Online' in location:
                         fraud_score += 10
                         fraud_reasons.append('Online transaction')
                     
-                    # Random fraud component (simulating ML model)
                     random_score = random.uniform(0, 40)
                     fraud_score += random_score
                     
-                    # Determine if fraudulent (threshold: 50)
                     is_fraudulent = fraud_score >= 50
                     if is_fraudulent:
                         fraud_count += 1
@@ -245,7 +235,9 @@ def fraud_detection_pipeline():
                         fraud_reason
                     ))
                 
-                # Insert in batches
+                # Use executemany instead of insert_rows (provider bug workaround)
+                conn = mysql_hook.get_conn()
+                cursor = conn.cursor()
                 insert_query = """
                 INSERT INTO labeled_transactions 
                 (transaction_id, is_fraudulent, fraud_score, fraud_reason)
@@ -256,13 +248,10 @@ def fraud_detection_pipeline():
                     fraud_reason = VALUES(fraud_reason),
                     labeled_at = CURRENT_TIMESTAMP
                 """
-                
-                mysql_hook.insert_rows(
-                    table='labeled_transactions',
-                    rows=labels,
-                    target_fields=['transaction_id', 'is_fraudulent', 'fraud_score', 'fraud_reason'],
-                    replace=True
-                )
+                cursor.executemany(insert_query, labels)
+                conn.commit()
+                cursor.close()
+                conn.close()
                 
                 fraud_percentage = (fraud_count / len(transactions) * 100) if transactions else 0
                 print(f"✅ Labeled {len(transactions)} transactions")
@@ -295,7 +284,6 @@ def fraud_detection_pipeline():
         """
         ti = context['ti']
         
-        # Get results from previous tasks
         txn_data = ti.xcom_pull(task_ids='generate_transaction_data')
         label_data = ti.xcom_pull(task_ids='generate_fraud_labels')
         
@@ -322,18 +310,11 @@ def fraud_detection_pipeline():
         }
     
     # Pipeline dependencies
-    # Step 1: Generate transactions
     txn_result = generate_transaction_data()
-    
-    # Step 2: Generate fraud labels
     label_result = generate_fraud_labels()
-    
-    # Step 3: Print summary
     summary = pipeline_summary()
     
-    # Flow: Generate transactions → Generate labels → Summary
     txn_result >> label_result >> summary
 
 
-# Instantiate the DAG
 fraud_detection_pipeline()
