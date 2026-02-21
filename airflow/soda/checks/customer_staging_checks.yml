@@ -1,6 +1,6 @@
 # ================================================================
 # Soda Quality Checks - CUSTOMER_TRANSACTIONS
-# Columns: TRANSACTION_ID (NUMBER), USER_ID (NUMBER), AMOUNT (FLOAT),
+# Columns: TRANSACTION_ID (NUMBER), CUSTOMER_ID (NUMBER), AMOUNT (FLOAT),
 #          TRANSACTION_DATE (VARCHAR), _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT,
 #          _AIRBYTE_META, _AIRBYTE_GENERATION_ID,
 #          _AB_SOURCE_FILE_URL, _AB_SOURCE_FILE_LAST_MODIFIED
@@ -12,8 +12,8 @@ checks for CUSTOMER_TRANSACTIONS:
       name: Table must not be empty
   - missing_count(TRANSACTION_ID) = 0:
       name: Transaction ID must not be null
-  - missing_count(USER_ID) = 0:
-      name: User ID must not be null
+  - missing_count(CUSTOMER_ID) = 0:
+      name: CUSTOMER ID must not be null
   - missing_count(AMOUNT) = 0:
       name: Amount must not be null
   - missing_count(TRANSACTION_DATE) = 0:
@@ -28,8 +28,8 @@ checks for CUSTOMER_TRANSACTIONS:
       name: All amounts must be positive
   - max(AMOUNT) < 1000000:
       name: No amount should exceed 1M (possible data error)
-  - min(USER_ID) > 0:
-      name: User IDs must be positive
+  - min(CUSTOMER_ID) > 0:
+      name: CUSTOMER IDs must be positive
   - min(TRANSACTION_ID) > 0:
       name: Transaction IDs must be positive
 
@@ -50,7 +50,7 @@ checks for CUSTOMER_TRANSACTIONS:
       warn:
         when required column missing:
           - TRANSACTION_ID
-          - USER_ID
+          - CUSTOMER_ID
           - AMOUNT
           - TRANSACTION_DATE
       fail:
