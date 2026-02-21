@@ -105,6 +105,18 @@ securityContexts:
 
 scheduler:
   replicas: 1
+  waitForMigrations:
+    enabled: false
+  # Airflow 3.x on KubernetesExecutor takes longer to initialise locally.
+  # Default 20s timeout kills the scheduler before it finishes starting up.
+  startupProbe:
+    timeoutSeconds: 60        # was 20s — give the health check more time
+    periodSeconds: 15         # check every 15s
+    failureThreshold: 20      # allow up to 5 minutes total startup time (15s x 20)
+  livenessProbe:
+    timeoutSeconds: 60        # was 20s
+    periodSeconds: 120        # check every 2 minutes once running
+    failureThreshold: 5       # 5 consecutive failures before restart
 
 triggerer:
   replicas: 1
