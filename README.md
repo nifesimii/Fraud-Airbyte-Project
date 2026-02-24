@@ -8,7 +8,7 @@ Modern data orchestration platform with Airflow on K3s (via Rancher Desktop), Ai
 
 ### Architecture Diagram
 
-![Fraud Detection Pipeline Architecture](images/fraud-detection-pipeline-architecture.svg)
+![Fraud Detection Pipeline Architecture](images/fraud-detection-pipeline-architecture.jpg)
 
 *Complete end-to-end architecture showing data flow from sources through ingestion, quality checks, transformation, and into the data warehouse.*
 
