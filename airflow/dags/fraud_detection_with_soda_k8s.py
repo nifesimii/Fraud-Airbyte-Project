@@ -189,7 +189,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id="fraud_detection_with_soda_k8s",
+    dag_id="fraud_detection_elt_pipeline",
     default_args=default_args,
     description="Fraud detection pipeline with Soda quality checks and dbt transforms",
     schedule=timedelta(hours=6),

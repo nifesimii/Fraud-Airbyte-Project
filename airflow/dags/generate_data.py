@@ -6,6 +6,7 @@ import random
 
 
 @dag(
+    dag_id="fraud_source_data_generation",
     schedule='@daily',
     start_date=datetime(2024, 1, 1),
     catchup=False,
@@ -30,9 +31,11 @@ import random
     data to your destination (Snowflake/BigQuery/S3).
     """
 )
-def fraud_detection_pipeline():
+def fraud_source_data_generation():
     """
-    End-to-end fraud detection data pipeline using Airbyte Cloud.
+    Generates source data for the fraud detection pipeline.
+    Populates PostgreSQL (transactions) and MySQL (fraud labels)
+    before Airbyte syncs them downstream.
     """
 
     @task
@@ -320,7 +323,7 @@ def fraud_detection_pipeline():
         label_data = ti.xcom_pull(task_ids='generate_fraud_labels')
 
         print("=" * 60)
-        print("🎉 FRAUD DETECTION DATA GENERATION COMPLETE")
+        print("🎉 FRAUD SOURCE DATA GENERATION COMPLETE")
         print("=" * 60)
         print(f"📅 Data Date      : {txn_data.get('data_date', 'N/A')}")
         print(f"📊 Transactions   : {txn_data.get('total_transactions', 0)}")
@@ -352,4 +355,4 @@ def fraud_detection_pipeline():
     label_result >> summary
 
 
-fraud_detection_pipeline()
+fraud_source_data_generation()
